@@ -1,7 +1,9 @@
 export const COLORS = ['red', 'blue', 'yellow', 'green'];
 export const NUMBERS = [1, 2, 3, 4];
 export const BOARD_SIZE = 4;
-export const JOKER_THRESHOLD = 800;
+export const GAME_MODES = { normal: { label: 'NORMAL', jokerThreshold: 400 }, easy: { label: 'EASY', jokerThreshold: 280 } };
+export const DEFAULT_MODE = 'normal';
+export const JOKER_THRESHOLD = GAME_MODES.normal.jokerThreshold;
 export const MAX_JOKERS = 2;
 
 export const COLOR_LABELS = { red: '赤', blue: '青', yellow: '黄', green: '緑', joker: 'J' };
@@ -29,7 +31,7 @@ export function createEmptyBoard() { return Array.from({ length: BOARD_SIZE }, (
 export function createDie(color, number, joker = false) { return { id: `die-${nextId++}`, color: joker ? 'joker' : color, number: joker ? 0 : number, joker, locked: false, source: 'batch' }; }
 export function createJoker() { return { ...createDie('joker', 0, true), source: 'joker' }; }
 export function rollDice(random = Math.random) { return Array.from({ length: 4 }, () => createDie(COLORS[Math.floor(random() * COLORS.length)], NUMBERS[Math.floor(random() * NUMBERS.length)])); }
-export function createInitialState() { return { board: createEmptyBoard(), trayDice: [], previousBatchDice: [], jokerStock: 0, jokerCountdown: JOKER_THRESHOLD, score: 0, highScore: 0, rankings: [], gameOver: false, message: 'ROLLで4つのサイコロを生成してください。' }; }
+export function createInitialState(mode = DEFAULT_MODE) { const selectedMode = GAME_MODES[mode] ? mode : DEFAULT_MODE; const jokerThreshold = GAME_MODES[selectedMode].jokerThreshold; return { mode: selectedMode, jokerThreshold, board: createEmptyBoard(), trayDice: [], previousBatchDice: [], jokerStock: 0, jokerCountdown: jokerThreshold, score: 0, highScore: 0, rankings: [], gameOver: false, message: 'ROLLで4つのサイコロを生成してください。' }; }
 
 export function getGroups() {
   const groups = [];
@@ -78,5 +80,5 @@ export function moveDie(board, dieId, row, col) { const next = cloneBoard(board)
 export function placeDie(board, row, col, die) { if (board[row][col]) throw new Error('Cell is already occupied'); const next = cloneBoard(board); next[row][col] = { ...die }; return next; }
 export function lockUnlockedDice(board) { const next = cloneBoard(board); const locked = []; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c] && !next[r][c].locked) { next[r][c].locked = true; locked.push(next[r][c]); } return { board: next, locked }; }
 export function hasEmptyCell(board) { return board.some(row => row.some(cell => cell === null)); }
-export function awardJokers(state, points) { let countdown = state.jokerCountdown; let stock = state.jokerStock; if (stock >= MAX_JOKERS) return { jokerStock: MAX_JOKERS, jokerCountdown: 0 }; countdown -= points; while (countdown <= 0 && stock < MAX_JOKERS) { stock++; countdown += JOKER_THRESHOLD; } if (stock >= MAX_JOKERS) countdown = 0; return { jokerStock: stock, jokerCountdown: countdown }; }
+export function awardJokers(state, points) { let countdown = state.jokerCountdown; let stock = state.jokerStock; if (stock >= MAX_JOKERS) return { jokerStock: MAX_JOKERS, jokerCountdown: 0 }; countdown -= points; while (countdown <= 0 && stock < MAX_JOKERS) { stock++; countdown += (state.jokerThreshold || JOKER_THRESHOLD); } if (stock >= MAX_JOKERS) countdown = 0; return { jokerStock: stock, jokerCountdown: countdown }; }
 export function saveRanking(rankings, name, score) { return [...rankings, { name: (name || 'NO NAME').slice(0, 12), score, date: new Date().toISOString() }].sort((a,b)=>b.score-a.score).slice(0,10); }

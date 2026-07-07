@@ -29,10 +29,18 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 function addLog(text) { const li = document.createElement('li'); li.textContent = text; logEl.prepend(li); }
 function endGame() { state.gameOver = true; overEl.hidden = false; state.message = 'ゲームオーバー。ランキングに登録してください。'; }
 function renderRankings() { rankingEl.innerHTML = ''; state.rankings.forEach((r,i) => { const li = document.createElement('li'); li.textContent = `${i+1}. ${r.name} ${r.score}`; rankingEl.appendChild(li); }); }
-function restartGame() { const ranks = state.rankings, high = state.highScore; Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false, dragging: null }); overEl.hidden = true; render(); }
+function restartGame(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  const ranks = state.rankings, high = state.highScore;
+  Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, gameOver: false, animating: false, dragging: null });
+  overEl.hidden = true;
+  render();
+}
 $('#rankForm').addEventListener('submit', e => { e.preventDefault(); state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score); localStorage.setItem(storage.ranks, JSON.stringify(state.rankings)); render(); });
 $('#restart').addEventListener('click', restartGame);
 gameOverRestartButton.addEventListener('click', restartGame);
+overEl.addEventListener('click', event => { if (event.target?.id === 'gameOverRestart') restartGame(event); });
 $('#rules').addEventListener('click', () => rulesDialog.showModal());
 $('#closeRules').addEventListener('click', () => rulesDialog.close());
 rollButton.addEventListener('click', roll);

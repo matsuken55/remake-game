@@ -1,14 +1,11 @@
 export const COLORS = ['red', 'blue', 'yellow', 'green'];
 export const NUMBERS = [1, 2, 3, 4];
 export const BOARD_SIZE = 4;
+export const JOKER_THRESHOLD = 800;
+export const MAX_JOKERS = 2;
 
-export const COLOR_LABELS = {
-  red: '赤',
-  blue: '青',
-  yellow: '黄',
-  green: '緑',
-  joker: 'J',
-};
+export const COLOR_LABELS = { red: '赤', blue: '青', yellow: '黄', green: '緑', joker: 'J' };
+export const COLOR_CODES = { red: 'r', blue: 'b', yellow: 'y', green: 'g' };
 
 export const CLEARING_HANDS = [
   { id: 'same-color-same-number', name: '同色同数字4個', points: 240 },
@@ -16,7 +13,6 @@ export const CLEARING_HANDS = [
   { id: 'rainbow-same-number', name: '4色同数字', points: 180 },
   { id: 'rainbow-straight', name: '4色1-4', points: 160 },
 ];
-
 export const SCORING_HANDS = [
   { id: 'same-color', name: '色4個', points: 40 },
   { id: 'same-number', name: '数字4個', points: 40 },
@@ -25,59 +21,28 @@ export const SCORING_HANDS = [
   { id: 'rainbow', name: '4色', points: 20 },
   { id: 'straight', name: '数字1-4', points: 20 },
 ];
+export const ALL_HANDS = [...CLEARING_HANDS, ...SCORING_HANDS];
 
-export function createEmptyBoard() {
-  return Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => null));
-}
-
-export function createDie(color, number, joker = false) {
-  return joker ? { color: 'joker', number: 0, joker: true } : { color, number, joker: false };
-}
-
-export function rollDice(random = Math.random, jokerChance = 0.08) {
-  return Array.from({ length: 4 }, () => {
-    if (random() < jokerChance) return createDie('joker', 0, true);
-    const color = COLORS[Math.floor(random() * COLORS.length)];
-    const number = NUMBERS[Math.floor(random() * NUMBERS.length)];
-    return createDie(color, number);
-  });
-}
+let nextId = 1;
+export function resetIds() { nextId = 1; }
+export function createEmptyBoard() { return Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => null)); }
+export function createDie(color, number, joker = false) { return { id: `die-${nextId++}`, color: joker ? 'joker' : color, number: joker ? 0 : number, joker, locked: false, source: 'batch' }; }
+export function createJoker() { return { ...createDie('joker', 0, true), source: 'joker' }; }
+export function rollDice(random = Math.random) { return Array.from({ length: 4 }, () => createDie(COLORS[Math.floor(random() * COLORS.length)], NUMBERS[Math.floor(random() * NUMBERS.length)])); }
+export function createInitialState() { return { board: createEmptyBoard(), trayDice: [], jokerStock: 0, jokerCountdown: JOKER_THRESHOLD, score: 0, highScore: 0, rankings: [], gameOver: false, message: 'ROLLで4つのサイコロを生成してください。' }; }
 
 export function getGroups() {
   const groups = [];
-  for (let r = 0; r < BOARD_SIZE; r++) groups.push({ type: 'row', cells: [[r,0],[r,1],[r,2],[r,3]] });
-  for (let c = 0; c < BOARD_SIZE; c++) groups.push({ type: 'column', cells: [[0,c],[1,c],[2,c],[3,c]] });
-  groups.push({ type: 'diagonal', cells: [[0,0],[1,1],[2,2],[3,3]] });
-  groups.push({ type: 'diagonal', cells: [[0,3],[1,2],[2,1],[3,0]] });
-  for (let r = 0; r < BOARD_SIZE - 1; r++) {
-    for (let c = 0; c < BOARD_SIZE - 1; c++) groups.push({ type: 'block', cells: [[r,c],[r,c+1],[r+1,c],[r+1,c+1]] });
-  }
-  groups.push({ type: 'corners', cells: [[0,0],[0,3],[3,0],[3,3]] });
+  for (let r = 0; r < BOARD_SIZE; r++) groups.push({ type: 'row', label: `横${r + 1}`, cells: [[r,0],[r,1],[r,2],[r,3]] });
+  for (let c = 0; c < BOARD_SIZE; c++) groups.push({ type: 'column', label: `縦${c + 1}`, cells: [[0,c],[1,c],[2,c],[3,c]] });
+  groups.push({ type: 'diagonal', label: '斜めA', cells: [[0,0],[1,1],[2,2],[3,3]] }, { type: 'diagonal', label: '斜めB', cells: [[0,3],[1,2],[2,1],[3,0]] });
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) groups.push({ type: 'block', label: `2x2 ${r + 1}-${c + 1}`, cells: [[r,c],[r,c+1],[r+1,c],[r+1,c+1]] });
+  groups.push({ type: 'corners', label: '四隅', cells: [[0,0],[0,3],[3,0],[3,3]] });
   return groups;
 }
-
-function counts(values) {
-  const map = new Map();
-  for (const value of values) map.set(value, (map.get(value) || 0) + 1);
-  return [...map.values()].sort((a, b) => b - a);
-}
-
-function canAssign(dice, predicate) {
-  const jokers = dice.filter(d => d.joker).length;
-  const fixed = dice.filter(d => !d.joker);
-  const assignments = [];
-  function backtrack(i, current) {
-    if (i === jokers) return predicate([...fixed, ...current]);
-    for (const color of COLORS) {
-      for (const number of NUMBERS) {
-        if (backtrack(i + 1, [...current, createDie(color, number)])) return true;
-      }
-    }
-    return false;
-  }
-  return backtrack(0, assignments);
-}
-
+function counts(values) { const map = new Map(); for (const value of values) map.set(value, (map.get(value) || 0) + 1); return [...map.values()].sort((a,b)=>b-a); }
+function isStraight(dice) { return dice.map(d => d.number).sort().join(',') === '1,2,3,4'; }
+function canAssign(dice, predicate) { const jokers = dice.filter(d => d.joker).length; const fixed = dice.filter(d => !d.joker); function backtrack(i, current) { if (i === jokers) return predicate([...fixed, ...current]); for (const color of COLORS) for (const number of NUMBERS) if (backtrack(i + 1, [...current, { color, number, joker: false }])) return true; return false; } return backtrack(0, []); }
 const predicates = {
   'same-color-same-number': dice => dice.every(d => d.color === dice[0].color && d.number === dice[0].number),
   'same-color-straight': dice => dice.every(d => d.color === dice[0].color) && isStraight(dice),
@@ -87,47 +52,15 @@ const predicates = {
   'same-number': dice => dice.every(d => d.number === dice[0].number),
   'two-color-pairs': dice => counts(dice.map(d => d.color)).join(',') === '2,2',
   'two-number-pairs': dice => counts(dice.map(d => d.number)).join(',') === '2,2',
-  'rainbow': dice => new Set(dice.map(d => d.color)).size === 4,
-  'straight': isStraight,
+  rainbow: dice => new Set(dice.map(d => d.color)).size === 4,
+  straight: isStraight,
 };
-
-function isStraight(dice) {
-  return dice.map(d => d.number).sort().join(',') === '1,2,3,4';
-}
-
-export function evaluateDice(dice) {
-  if (dice.length !== 4) return null;
-  for (const hand of CLEARING_HANDS) if (canAssign(dice, predicates[hand.id])) return { ...hand, clearing: true };
-  for (const hand of SCORING_HANDS) if (canAssign(dice, predicates[hand.id])) return { ...hand, clearing: false };
-  return null;
-}
-
-export function evaluateBoard(board) {
-  const matches = [];
-  for (const group of getGroups()) {
-    const dice = group.cells.map(([r, c]) => board[r][c]);
-    if (dice.every(Boolean)) {
-      const hand = evaluateDice(dice);
-      if (hand) matches.push({ ...group, hand });
-    }
-  }
-  const clearCells = new Set();
-  let score = 0;
-  for (const match of matches) {
-    score += match.hand.points;
-    if (match.hand.clearing) for (const [r, c] of match.cells) clearCells.add(`${r},${c}`);
-  }
-  const nextBoard = board.map(row => row.map((die, c) => die));
-  for (const key of clearCells) {
-    const [r, c] = key.split(',').map(Number);
-    nextBoard[r][c] = null;
-  }
-  return { matches, score, clearCells, nextBoard };
-}
-
-export function placeDie(board, row, col, die) {
-  if (board[row][col]) throw new Error('Cell is already occupied');
-  const next = board.map(r => [...r]);
-  next[row][col] = die;
-  return next;
-}
+export function evaluateDice(dice) { if (dice.length !== 4) return null; for (const hand of ALL_HANDS) if (canAssign(dice, predicates[hand.id])) return { ...hand, clearing: CLEARING_HANDS.some(h => h.id === hand.id) }; return null; }
+export function evaluateBoard(board) { const matches = []; for (const group of getGroups()) { const dice = group.cells.map(([r,c]) => board[r][c]); if (dice.every(Boolean) && dice.some(d => d.locked)) { const hand = evaluateDice(dice); if (hand) matches.push({ ...group, hand }); } } return matches; }
+export function cloneBoard(board) { return board.map(row => row.map(cell => cell ? { ...cell } : null)); }
+export function moveDie(board, dieId, row, col) { const next = cloneBoard(board); let die = null; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c]?.id === dieId) { if (next[r][c].locked) return { board, moved: false }; die = next[r][c]; next[r][c] = null; } if (next[row][col]) return { board, moved: false }; next[row][col] = die; return { board: next, moved: true }; }
+export function placeDie(board, row, col, die) { if (board[row][col]) throw new Error('Cell is already occupied'); const next = cloneBoard(board); next[row][col] = { ...die }; return next; }
+export function lockUnlockedDice(board) { const next = cloneBoard(board); const locked = []; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c] && !next[r][c].locked) { next[r][c].locked = true; locked.push(next[r][c]); } return { board: next, locked }; }
+export function hasEmptyCell(board) { return board.some(row => row.some(cell => cell === null)); }
+export function awardJokers(state, points) { let countdown = state.jokerCountdown; let stock = state.jokerStock; if (stock >= MAX_JOKERS) return { jokerStock: MAX_JOKERS, jokerCountdown: 0 }; countdown -= points; while (countdown <= 0 && stock < MAX_JOKERS) { stock++; countdown += JOKER_THRESHOLD; } if (stock >= MAX_JOKERS) countdown = 0; return { jokerStock: stock, jokerCountdown: countdown }; }
+export function saveRanking(rankings, name, score) { return [...rankings, { name: (name || 'NO NAME').slice(0, 12), score, date: new Date().toISOString() }].sort((a,b)=>b.score-a.score).slice(0,10); }

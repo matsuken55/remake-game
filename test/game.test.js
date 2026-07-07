@@ -76,6 +76,22 @@ test('joker can overwrite a locked normal die and is evaluated as a joker', () =
   assert.equal(matches.some(match => match.hand.id === 'same-color-straight'), true);
 });
 
+test('pending joker overlay keeps the covered locked die until the joker is locked', () => {
+  let board = createEmptyBoard();
+  const coveredDie = createDie('blue', 4);
+  board = placeDie(board, 0, 0, coveredDie);
+  board = lockUnlockedDice(board).board;
+  board = placeDie(board, 0, 0, createDie('joker', 0, true));
+  assert.equal(board[0][0].joker, true);
+  assert.equal(board[0][0].locked, false);
+  assert.equal(board[0][0].underlyingDie.id, coveredDie.id);
+  assert.equal(board[0][0].underlyingDie.locked, true);
+  const locked = lockUnlockedDice(board);
+  assert.equal(locked.board[0][0].joker, true);
+  assert.equal(locked.board[0][0].locked, true);
+  assert.equal(locked.board[0][0].underlyingDie, undefined);
+});
+
 test('normal dice cannot overwrite locked cells', () => {
   let board = createEmptyBoard();
   board = placeDie(board, 0, 0, createDie('red', 1));

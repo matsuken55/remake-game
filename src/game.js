@@ -75,17 +75,18 @@ export function rollBalancedDice(previousBatch = [], random = Math.random) {
   return numbers.map(number => createDie('red', number));
 }
 export function evaluateBoard(board, triggeringIds = null) { const matches = []; const triggerSet = triggeringIds ? new Set(triggeringIds) : null; for (const group of getGroups()) { const dice = group.cells.map(([r,c]) => board[r][c]); const hasTrigger = triggerSet ? dice.some(d => d && triggerSet.has(d.id)) : dice.some(d => d?.locked); if (dice.every(Boolean) && hasTrigger) { const hand = evaluateDice(dice); if (hand) matches.push({ ...group, hand }); } } return matches; }
-export function cloneBoard(board) { return board.map(row => row.map(cell => cell ? { ...cell } : null)); }
+function cloneDie(die) { return die ? { ...die, underlyingDie: cloneDie(die.underlyingDie) } : null; }
+export function cloneBoard(board) { return board.map(row => row.map(cloneDie)); }
 export function moveDie(board, dieId, row, col) { const next = cloneBoard(board); let die = null; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c]?.id === dieId) { if (next[r][c].locked) return { board, moved: false }; die = next[r][c]; next[r][c] = null; } if (next[row][col]) return { board, moved: false }; next[row][col] = die; return { board: next, moved: true }; }
 export function placeDie(board, row, col, die) {
   const occupied = board[row][col];
   const canOverwriteLockedNormal = die?.joker && occupied?.locked && !occupied?.joker;
   if (occupied && !canOverwriteLockedNormal) throw new Error('Cell is already occupied');
   const next = cloneBoard(board);
-  next[row][col] = { ...die, locked: false };
+  next[row][col] = { ...die, locked: false, ...(canOverwriteLockedNormal ? { underlyingDie: cloneDie(occupied) } : {}) };
   return next;
 }
-export function lockUnlockedDice(board) { const next = cloneBoard(board); const locked = []; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c] && !next[r][c].locked) { next[r][c].locked = true; locked.push(next[r][c]); } return { board: next, locked }; }
+export function lockUnlockedDice(board) { const next = cloneBoard(board); const locked = []; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c] && !next[r][c].locked) { delete next[r][c].underlyingDie; next[r][c].locked = true; locked.push(next[r][c]); } return { board: next, locked }; }
 export function hasEmptyCell(board) { return board.some(row => row.some(cell => cell === null)); }
 export function awardJokers(state, points) { let countdown = state.jokerCountdown; let stock = state.jokerStock; if (stock >= MAX_JOKERS) return { jokerStock: MAX_JOKERS, jokerCountdown: 0 }; countdown -= points; while (countdown <= 0 && stock < MAX_JOKERS) { stock++; countdown += (state.jokerThreshold || JOKER_THRESHOLD); } if (stock >= MAX_JOKERS) countdown = 0; return { jokerStock: stock, jokerCountdown: countdown }; }
 export function saveRanking(rankings, name, score) { return [...rankings, { name: (name || 'NO NAME').slice(0, 12), score, date: new Date().toISOString() }].sort((a,b)=>b.score-a.score).slice(0,15); }

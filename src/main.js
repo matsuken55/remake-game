@@ -1,11 +1,12 @@
 import { ALL_HANDS, BOARD_SIZE, COLOR_CODES, COLOR_LABELS, DEFAULT_MODE, GAME_MODES, createInitialState, createJoker, evaluateBoard, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, placeDie, rollBalancedDice, saveRanking, awardJokers } from './game.js';
-import { getLocalRankings, saveLocalRanking } from './rankings.js';
+import { getDisplayedRankings, getLocalRankings, saveLocalRanking, submitRemoteRanking } from './rankings.js';
 
 const storage = {
   legacyHigh: 'remakeDice.highScore',
   legacyRanks: 'remakeDice.rankings',
   high: { normal: 'diceBatchGridHighNormal', easy: 'diceBatchGridHighEasy' },
   ranks: { normal: 'diceBatchGridRankingsNormal', easy: 'diceBatchGridRankingsEasy' },
+  bgmEnabled: 'diceBatchGridBgmEnabled',
 };
 const state = createInitialState();
 let rankingViewMode = DEFAULT_MODE;
@@ -15,7 +16,26 @@ let registeredGameOverId = null;
 Object.assign(state, { highScore: loadHighScore(state.mode), rankings: loadRankings(state.mode), animating: false, dragging: null, rankRegistered: false, started: false });
 
 const $ = s => document.querySelector(s);
-const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), modeLabelEl = $('#modeLabel'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), startEl = $('#startScreen'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rankingViewEl = $('#rankingView'), rankingViewListEl = $('#rankingViewList'), rulesDialog = $('#scoreDialog'), gameOverRestartButton = $('#gameOverRestart'), scoreExamplesEl = $('#scoreExamples');
+const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), modeLabelEl = $('#modeLabel'), msgEl = $('#message'), bgmStatusEl = $('#bgmStatus'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), startEl = $('#startScreen'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rankingViewEl = $('#rankingView'), rankingViewListEl = $('#rankingViewList'), rulesDialog = $('#scoreDialog'), gameOverRestartButton = $('#gameOverRestart'), scoreExamplesEl = $('#scoreExamples'), bgmToggleEl = $('#bgmToggle');
+
+
+const bgm = {
+  audio: typeof Audio === 'function' ? new Audio('assets/audio/bgm.mp3') : null,
+  enabled: localStorage.getItem(storage.bgmEnabled) !== 'off',
+  unlocked: false,
+  missing: false,
+};
+if (bgm.audio) {
+  bgm.audio.loop = true;
+  bgm.audio.volume = 0.35;
+  bgm.audio.preload = 'auto';
+  bgm.audio.addEventListener('ended', () => { bgm.audio.currentTime = 0; playBgm(); });
+  bgm.audio.addEventListener('error', () => { bgm.missing = true; updateBgmUi('BGMファイルが見つかりません'); });
+}
+function updateBgmUi(status = '') { if (bgmToggleEl) bgmToggleEl.textContent = `BGM ${bgm.enabled ? 'ON' : 'OFF'}`; if (bgmStatusEl) bgmStatusEl.textContent = status; }
+function playBgm() { if (!bgm.enabled || !bgm.audio) return; bgm.audio.play?.().catch(() => { bgm.missing = true; updateBgmUi('BGMファイルが見つかりません'); }); }
+function unlockBgm() { bgm.unlocked = true; playBgm(); }
+function toggleBgm() { bgm.enabled = !bgm.enabled; localStorage.setItem(storage.bgmEnabled, bgm.enabled ? 'on' : 'off'); if (!bgm.enabled) bgm.audio?.pause?.(); else if (bgm.unlocked) playBgm(); updateBgmUi(bgm.missing ? 'BGMファイルが見つかりません' : ''); }
 
 function modeStorageKey(kind, mode) { return storage[kind][GAME_MODES[mode] ? mode : DEFAULT_MODE]; }
 function loadRankings(mode) {
@@ -56,29 +76,32 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 function addLog(text) { console.info(`[game] ${text}`); }
 function closeGameOverModal() { overEl.hidden = true; overEl.setAttribute?.('aria-hidden', 'true'); overEl.style.display = 'none'; }
 function openGameOverModal() { overEl.hidden = false; overEl.setAttribute?.('aria-hidden', 'false'); overEl.style.display = ''; }
-function endGame() { state.gameOver = true; state.rankRegistered = false; activeGameOverId = ++gameOverSequence; openGameOverModal(); state.message = 'ゲームオーバー。ランキングに登録してください。'; render(); }
+function endGame() { state.gameOver = true; state.rankRegistered = false; activeGameOverId = ++gameOverSequence; openGameOverModal(); state.message = 'ゲームオーバー。ランキングに登録してください。'; render(); renderDisplayedRankings(state.mode, rankingEl); }
 function fillRankingList(listEl, rankings = state.rankings) { listEl.innerHTML = ''; rankings.forEach((r,i) => { const li = document.createElement('li'); li.textContent = `${i+1}. ${r.name} ${r.score}`; listEl.appendChild(li); }); }
 function renderRankings() { fillRankingList(rankingEl, state.rankings); fillRankingList(rankingViewListEl, loadRankings(rankingViewMode)); }
+async function renderDisplayedRankings(mode = rankingViewMode, listEl = rankingViewListEl) { const local = loadRankings(mode); fillRankingList(listEl, local); if (!document.head && !document.body) return local; const rankings = await getDisplayedRankings(mode, local); fillRankingList(listEl, rankings); return rankings; }
 function renderScoreExamples() { const examples = { 'same-color-same-number': ['r1','r1','r1','r1'], 'same-color-straight': ['b1','b2','b3','b4'], 'rainbow-same-number': ['r2','b2','y2','g2'], 'rainbow-straight': ['r1','b2','y3','g4'], 'same-color': ['g1','g2','g3','g4'], 'same-number': ['r4','b4','y4','g4'], 'two-color-pairs': ['r1','r3','b2','b4'], 'two-number-pairs': ['r1','b1','y3','g3'], rainbow: ['r1','b3','y2','g4'], straight: ['r1','b2','y3','g4'] }; scoreExamplesEl.innerHTML = ''; ALL_HANDS.forEach(hand => { const row = document.createElement('div'); row.className = 'score-row'; const dice = document.createElement('div'); dice.className = 'mini-dice'; examples[hand.id].forEach(name => { const img = document.createElement('img'); img.src = `assets/dice/${name}.png`; img.alt = name; dice.appendChild(img); }); const label = document.createElement('strong'); label.textContent = hand.name; const meta = document.createElement('span'); meta.textContent = `${hand.points}点 / ${hand.clearing || ['same-color-same-number','same-color-straight','rainbow-same-number','rainbow-straight'].includes(hand.id) ? '消える' : '消えない'}`; row.appendChild(dice); row.appendChild(label); row.appendChild(meta); scoreExamplesEl.appendChild(row); }); }
 function startNewGame(mode = state.mode, showStart = false) { state.dragging?.ghost?.remove?.(); closeGameOverModal(); const next = createInitialState(mode); Object.assign(state, next, { rankings: loadRankings(next.mode), highScore: loadHighScore(next.mode), animating: false, dragging: null, rankRegistered: false, started: !showStart }); activeGameOverId = null; $('#playerName').value = ''; startEl.hidden = !showStart; startEl.setAttribute?.('aria-hidden', showStart ? 'false' : 'true'); startEl.style.display = showStart ? '' : 'none'; render(); }
 function selectedStartMode() { return document.querySelector('input[name="gameMode"]:checked')?.value || DEFAULT_MODE; }
-function startSelectedGame() { startNewGame(selectedStartMode(), false); }
+function startSelectedGame() { unlockBgm(); startNewGame(selectedStartMode(), false); }
 const resetToNewGame = startNewGame;
 function restartGame(event) { event?.preventDefault?.(); event?.stopPropagation?.(); resetToNewGame(); }
-function registerRanking(event) { event.preventDefault(); if (!state.gameOver || overEl.hidden || state.rankRegistered || activeGameOverId === null || registeredGameOverId === activeGameOverId) return; state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score); saveLocalRanking(localStorage, modeStorageKey('ranks', state.mode), state.rankings); state.rankRegistered = true; registeredGameOverId = activeGameOverId; resetToNewGame(); }
+function registerRanking(event) { event.preventDefault(); if (!state.gameOver || overEl.hidden || state.rankRegistered || activeGameOverId === null || registeredGameOverId === activeGameOverId) return; const mode = state.mode; const name = $('#playerName').value; const score = state.score; state.rankings = saveRanking(state.rankings, name, score); saveLocalRanking(localStorage, modeStorageKey('ranks', mode), state.rankings); state.rankRegistered = true; registeredGameOverId = activeGameOverId; resetToNewGame(); submitRemoteRanking(mode, name, score).catch(() => { state.message = 'オンラインランキング送信に失敗しました'; if (typeof document !== 'undefined') render(); }); }
 $('#rankForm').addEventListener('submit', registerRanking);
 $('#restart').addEventListener('click', restartGame);
 gameOverRestartButton.addEventListener('click', restartGame);
 overEl.addEventListener('click', event => { if (event.target?.id === 'gameOverRestart') restartGame(event); });
 $('#rules').addEventListener('click', () => rulesDialog.showModal());
 $('#closeRules').addEventListener('click', () => rulesDialog.close());
-$('#rankingButton').addEventListener('click', () => { rankingViewMode = state.mode; renderRankings(); rankingViewEl.showModal(); });
-$('#rankingNormal').addEventListener('click', () => { rankingViewMode = 'normal'; renderRankings(); });
-$('#rankingEasy').addEventListener('click', () => { rankingViewMode = 'easy'; renderRankings(); });
+$('#rankingButton').addEventListener('click', () => { rankingViewMode = state.mode; renderRankings(); rankingViewEl.showModal(); renderDisplayedRankings(rankingViewMode); });
+$('#rankingNormal').addEventListener('click', () => { rankingViewMode = 'normal'; renderDisplayedRankings(rankingViewMode); });
+$('#rankingEasy').addEventListener('click', () => { rankingViewMode = 'easy'; renderDisplayedRankings(rankingViewMode); });
 $('#startGame').addEventListener('click', startSelectedGame);
 $('#closeRankingView').addEventListener('click', () => rankingViewEl.close());
-rollButton.addEventListener('click', roll);
+rollButton.addEventListener('click', event => { unlockBgm(); roll(event); });
+bgmToggleEl?.addEventListener('click', toggleBgm);
 renderScoreExamples();
+updateBgmUi();
 startNewGame(DEFAULT_MODE, true);
 
 export const __testing = { state, endGame, restartGame, registerRanking, startNewGame, startDrag, dropDie, cancelDrag };

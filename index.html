@@ -19,6 +19,7 @@
       <strong class="mode-badge">MODE: <span id="modeLabel">NORMAL</span></strong>
       <strong>Jokerまで: <span id="jokerCountdown">400</span></strong>
       <p id="message"></p>
+      <p id="bgmStatus" class="bgm-status" aria-live="polite"></p>
     </section>
 
     <section class="control-row">
@@ -43,6 +44,7 @@
       <button id="rules">役点数一覧</button>
       <button id="restart">リスタート</button>
       <button id="rankingButton">ランキング</button>
+      <button id="bgmToggle" type="button">BGM ON</button>
     </section>
 
     <section id="startScreen" class="overlay start-overlay" aria-hidden="false">
@@ -60,7 +62,7 @@
     <section id="gameOver" class="overlay" hidden aria-hidden="true" style="display:none">
       <form id="rankForm" class="game-over">
         <h2>ゲームオーバー</h2>
-        <p>名前を登録して端末内ランキングに保存します。</p>
+        <p>名前を登録して端末内ランキングとオンラインランキングに保存します。</p>
         <input id="playerName" maxlength="12" placeholder="NAME"/>
         <button type="submit">登録</button>
         <button type="button" id="gameOverRestart">リスタート</button>
@@ -71,7 +73,7 @@
 
     <dialog id="rankingView">
       <h2>ランキング</h2>
-      <p>端末内に保存されたランキングを閲覧できます。</p>
+      <p>オンラインランキングを取得して表示します。取得できない場合は端末内ランキングを表示します。</p>
       <div class="ranking-tabs" role="group" aria-label="ランキングモード">
         <button id="rankingNormal" type="button">Normal</button>
         <button id="rankingEasy" type="button">Easy</button>

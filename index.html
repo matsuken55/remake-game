@@ -3,37 +3,37 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dice Batch Grid</title>
+  <title>ならべてポン</title>
   <link rel="stylesheet" href="./src/styles.css"/>
 </head>
 <body>
   <main class="app">
     <section class="hero compact-hero">
-      <p class="eyebrow">4x4 Dice Batch Puzzle</p>
-      <h1>Dice Batch Grid</h1>
+      <p class="eyebrow">ならべて、そろえて、消していく。</p>
+      <h1>ならべてポン</h1>
     </section>
 
     <section class="status top-status" aria-label="スコア情報">
       <strong>Score: <span id="score">0</span></strong>
-      <strong>High: <span id="highScore">0</span></strong>
+      <strong class="high-score">High: <span id="highScore">0</span></strong>
       <strong class="mode-badge">MODE: <span id="modeLabel">NORMAL</span></strong>
-      <strong>Jokerまで: <span id="jokerCountdown">400</span></strong>
       <p id="message"></p>
       <p id="bgmStatus" class="bgm-status" aria-live="polite"></p>
     </section>
 
     <section class="control-row">
-      <button id="roll">ROLL</button>
+      <button id="roll">補充</button>
       <div class="joker-panel">
         <h2>ジョーカー</h2>
         <section id="jokerWindow" class="jokers" aria-label="ジョーカーストック"></section>
+        <p class="joker-countdown">次のジョーカーまで：<span id="jokerCountdown">400</span></p>
       </div>
     </section>
 
     <section class="play-area">
       <div class="tray-panel">
-        <h2>現在のバッチ</h2>
-        <section id="tray" class="tray" aria-label="現在のバッチ"></section>
+        <h2>ストック</h2>
+        <section id="tray" class="tray" aria-label="ストック"></section>
       </div>
       <div id="boardWrap" class="board-wrap">
         <section id="board" class="board" aria-label="4x4盤面"></section>
@@ -41,6 +41,7 @@
     </section>
 
     <section class="actions">
+      <button id="howToPlay" type="button">遊び方</button>
       <button id="rules">役点数一覧</button>
       <button id="restart">リスタート</button>
       <button id="rankingButton">ランキング</button>
@@ -55,6 +56,7 @@
           <label><input type="radio" name="gameMode" value="normal" checked> Normal</label>
           <label><input type="radio" name="gameMode" value="easy"> Easy</label>
         </div>
+        <button id="howToPlayStart" type="button">遊び方</button>
         <button id="startGame" type="button">ゲーム開始</button>
       </div>
     </section>
@@ -62,9 +64,9 @@
     <section id="gameOver" class="overlay" hidden aria-hidden="true" style="display:none">
       <form id="rankForm" class="game-over">
         <h2>ゲームオーバー</h2>
-        <p>名前を登録して端末内ランキングとオンラインランキングに保存します。</p>
+        <p id="gameOverMessage">名前を登録して端末内ランキングとオンラインランキングに保存します。</p>
         <input id="playerName" maxlength="12" placeholder="NAME"/>
-        <button type="submit">登録</button>
+        <button id="rankSubmit" type="submit">登録</button>
         <button type="button" id="gameOverRestart">リスタート</button>
         <h3>ランキング</h3>
         <ol id="rankingList"></ol>
@@ -80,6 +82,21 @@
       </div>
       <ol id="rankingViewList"></ol>
       <button id="closeRankingView">閉じる</button>
+    </dialog>
+
+    <dialog id="howToDialog">
+      <h2>遊び方</h2>
+      <ul class="howto-list">
+        <li>サイコロをストックから盤面へ配置します</li>
+        <li>「確定」で置いたサイコロをロックし、役判定します</li>
+        <li>タテ、ヨコ、ナナメ、隣接する2x2の4マス、4隅が判定対象です</li>
+        <li>4マスに役をそろえるとサイコロが消えて点数が入ります</li>
+        <li>ジョーカーは好きな色・数字として使えます</li>
+        <li>ジョーカーはロック済みサイコロの上にも置けます</li>
+        <li>盤面に置けなくなるまでプレイし、最高得点でランキング入りを目指します</li>
+        <li>Easyはジョーカーが補充されやすいモードです</li>
+      </ul>
+      <button id="closeHowTo" type="button">閉じる</button>
     </dialog>
 
     <dialog id="scoreDialog">

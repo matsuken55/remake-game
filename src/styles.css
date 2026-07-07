@@ -2,3 +2,4 @@
 .mode-badge{font-size:.82rem;color:#bfdbfe}.start-overlay{z-index:30}.start-card p{margin:.1rem 0;color:#dbeafe}.mode-select{display:flex;gap:.8rem;flex-wrap:wrap}.mode-select label{display:flex;align-items:center;gap:.35rem;background:#101827;border:1px solid #33415f;border-radius:999px;padding:.55rem .8rem;font-weight:900}.ranking-tabs{display:flex;gap:.5rem;margin:.5rem 0}.ranking-tabs button{padding:.5rem .85rem;min-height:38px}
 
 .bgm-status{flex:1 1 100%;margin:0;color:#fca5a5;font-size:.82rem}.bgm-status:empty{display:none}
+.high-score{font-size:1.12rem;color:#fde68a;text-shadow:0 0 10px #f59e0b55}.joker-countdown{margin:0;color:#dbeafe;font-size:.9rem;font-weight:800}.howto-list{display:grid;gap:.4rem;padding-left:1.2rem;line-height:1.45}

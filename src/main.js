@@ -5,7 +5,7 @@ const state = createInitialState();
 Object.assign(state, { highScore: Number(localStorage.getItem(storage.high) || 0), rankings: JSON.parse(localStorage.getItem(storage.ranks) || '[]'), animating: false, dragging: null });
 
 const $ = s => document.querySelector(s);
-const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), logEl = $('#log'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rulesDialog = $('#scoreDialog');
+const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), logEl = $('#log'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rulesDialog = $('#scoreDialog'), gameOverRestartButton = $('#gameOverRestart');
 
 function asset(die) { return die.joker ? 'assets/dice/JK.png' : `assets/dice/${COLOR_CODES[die.color]}${die.number}.png`; }
 function dieElement(die) { const el = document.createElement('div'); el.className = `die ${die.color} ${die.locked ? 'locked' : 'unlocked'} ${die.joker ? 'joker' : ''}`; el.dataset.id = die.id; const img = document.createElement('img'); img.src = asset(die); img.alt = die.joker ? 'ジョーカー' : `${COLOR_LABELS[die.color]}${die.number}`; el.appendChild(img); if (die.locked) el.insertAdjacentHTML('beforeend', '<span class="lock">🔒</span>'); return el; }
@@ -29,8 +29,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 function addLog(text) { const li = document.createElement('li'); li.textContent = text; logEl.prepend(li); }
 function endGame() { state.gameOver = true; overEl.hidden = false; state.message = 'ゲームオーバー。ランキングに登録してください。'; }
 function renderRankings() { rankingEl.innerHTML = ''; state.rankings.forEach((r,i) => { const li = document.createElement('li'); li.textContent = `${i+1}. ${r.name} ${r.score}`; rankingEl.appendChild(li); }); }
-$('#rankForm').addEventListener('submit', e => { e.preventDefault(); state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score); localStorage.setItem(storage.ranks, JSON.stringify(state.rankings)); render(); });
-$('#restart').addEventListener('click', () => { const ranks = state.rankings, high = state.highScore; Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false }); overEl.hidden = true; render(); });
+function restartGame(event) { event?.preventDefault?.(); event?.stopPropagation?.(); const ranks = state.rankings, high = state.highScore; Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false, dragging: null }); overEl.hidden = true; render(); }
+const rankForm = $('#rankForm');
+rankForm.addEventListener('submit', e => { e.preventDefault(); state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score); localStorage.setItem(storage.ranks, JSON.stringify(state.rankings)); render(); });
+rankForm.addEventListener('click', e => { if (e.target?.id === 'gameOverRestart') restartGame(e); });
+$('#restart').addEventListener('click', restartGame);
+gameOverRestartButton.addEventListener('click', restartGame);
 $('#rules').addEventListener('click', () => rulesDialog.showModal());
 $('#closeRules').addEventListener('click', () => rulesDialog.close());
 rollButton.addEventListener('click', roll);

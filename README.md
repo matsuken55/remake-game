@@ -76,3 +76,16 @@ npm start
 ```
 
 `npm start`後、`http://127.0.0.1:4173`で表示確認できます。
+
+
+## 効果音ファイル
+
+効果音の mp3 ファイルはリポジトリに含めず、GitHub 上で `assets/audio/` に手動アップロードしてください。コードは以下のパスを参照します。ファイルが未アップロード、404、読み込み失敗、再生失敗になってもゲームは停止しません。
+
+- `assets/audio/erace.mp3`（サイコロ消去。ファイル名は `erace` のまま）
+- `assets/audio/hojyu.mp3`（補充）
+- `assets/audio/joker.mp3`（ジョーカー補充）
+- `assets/audio/last.mp3`（ゲームオーバー）
+- `assets/audio/lock.mp3`（確定ロック）
+- `assets/audio/start.mp3`（ゲーム開始）
+- `assets/audio/bgm.mp3`（既存BGM）

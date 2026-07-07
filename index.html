@@ -7,6 +7,12 @@
   <link rel="stylesheet" href="./src/styles.css"/>
 </head>
 <body>
+  <section class="title-splash" aria-hidden="true">
+    <div class="title-splash-card">
+      <p class="title-splash-main">ならべてポン</p>
+      <p class="title-splash-sub">ならべて、そろえて、消していく。</p>
+    </div>
+  </section>
   <main class="app">
     <section class="hero compact-hero">
       <p class="eyebrow">ならべて、そろえて、消していく。</p>
@@ -14,19 +20,22 @@
     </section>
 
     <section class="status top-status" aria-label="スコア情報">
-      <strong>Score: <span id="score">0</span></strong>
-      <strong class="high-score">High: <span id="highScore">0</span></strong>
+      <strong>Score: <span id="score">0点</span></strong>
+      <strong class="high-score">High: <span id="highScore">0点</span></strong>
       <strong class="mode-badge">MODE: <span id="modeLabel">NORMAL</span></strong>
       <p id="message"></p>
       <p id="bgmStatus" class="bgm-status" aria-live="polite"></p>
     </section>
 
     <section class="control-row">
-      <button id="roll">補充</button>
+      <div class="main-action">
+        <button id="roll" class="primary-action">補充</button>
+        <p id="actionHint" class="action-hint">補充：サイコロを4つ出します</p>
+      </div>
       <div class="joker-panel">
         <h2>ジョーカー</h2>
         <section id="jokerWindow" class="jokers" aria-label="ジョーカーストック"></section>
-        <p class="joker-countdown">次のジョーカーまで：<span id="jokerCountdown">400</span></p>
+        <p class="joker-countdown">次のジョーカーまで：<span id="jokerCountdown">400点</span></p>
       </div>
     </section>
 

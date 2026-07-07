@@ -11,7 +11,7 @@ const $ = s => document.querySelector(s);
 const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), logEl = $('#log'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rulesDialog = $('#scoreDialog'), gameOverRestartButton = $('#gameOverRestart');
 
 function loadHighScore() { return Number(localStorage.getItem(storage.high) || 0); }
-function loadRankings() { return JSON.parse(localStorage.getItem(storage.ranks) || '[]'); }
+function loadRankings() { try { const rankings = JSON.parse(localStorage.getItem(storage.ranks) || '[]'); return Array.isArray(rankings) ? rankings : []; } catch { return []; } }
 function asset(die) { return die.joker ? 'assets/dice/JK.png' : `assets/dice/${COLOR_CODES[die.color]}${die.number}.png`; }
 function dieElement(die) { const el = document.createElement('div'); el.className = `die ${die.color} ${die.locked ? 'locked' : 'unlocked'} ${die.joker ? 'joker' : ''}`; el.dataset.id = die.id; const img = document.createElement('img'); img.src = asset(die); img.alt = die.joker ? 'ジョーカー' : `${COLOR_LABELS[die.color]}${die.number}`; el.appendChild(img); if (die.locked) el.insertAdjacentHTML('beforeend', '<span class="lock">🔒</span>'); return el; }
 function render() {
@@ -32,16 +32,20 @@ async function resolveMatches() { state.animating = true; render(); const matche
 function showMatch(match) { return new Promise(resolve => { match.cells.forEach(([r,c]) => boardEl.children[r*4+c]?.classList.add('flash')); msgEl.textContent = `+${match.hand.points} ${match.hand.name}`; setTimeout(resolve, 1000); }); }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function addLog(text) { const li = document.createElement('li'); li.textContent = text; logEl.prepend(li); }
-function endGame() { state.gameOver = true; state.rankRegistered = false; activeGameOverId = ++gameOverSequence; overEl.hidden = false; state.message = 'ゲームオーバー。ランキングに登録してください。'; render(); }
+function closeGameOverModal() { overEl.hidden = true; overEl.setAttribute?.('aria-hidden', 'true'); overEl.style.display = 'none'; }
+function openGameOverModal() { overEl.hidden = false; overEl.setAttribute?.('aria-hidden', 'false'); overEl.style.display = ''; }
+function endGame() { state.gameOver = true; state.rankRegistered = false; activeGameOverId = ++gameOverSequence; openGameOverModal(); state.message = 'ゲームオーバー。ランキングに登録してください。'; render(); }
 function renderRankings() { rankingEl.innerHTML = ''; state.rankings.forEach((r,i) => { const li = document.createElement('li'); li.textContent = `${i+1}. ${r.name} ${r.score}`; rankingEl.appendChild(li); }); }
-function resetToNewGame() {
+function startNewGame() {
   state.dragging?.ghost?.remove?.();
+  closeGameOverModal();
   const ranks = state.rankings, high = state.highScore;
   Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false, dragging: null, rankRegistered: false });
   activeGameOverId = null;
-  overEl.hidden = true;
+  $('#playerName').value = '';
   render();
 }
+const resetToNewGame = startNewGame;
 function restartGame(event) {
   event?.preventDefault?.();
   event?.stopPropagation?.();
@@ -63,7 +67,6 @@ overEl.addEventListener('click', event => { if (event.target?.id === 'gameOverRe
 $('#rules').addEventListener('click', () => rulesDialog.showModal());
 $('#closeRules').addEventListener('click', () => rulesDialog.close());
 rollButton.addEventListener('click', roll);
-overEl.hidden = true;
-render();
+startNewGame();
 
-export const __testing = { state, endGame, restartGame, registerRanking };
+export const __testing = { state, endGame, restartGame, registerRanking, startNewGame };

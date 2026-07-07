@@ -41,6 +41,7 @@
     <section class="actions">
       <button id="rules">役点数一覧</button>
       <button id="restart">リスタート</button>
+      <button id="rankingButton">ランキング</button>
     </section>
 
     <section id="gameOver" class="overlay" hidden aria-hidden="true" style="display:none">
@@ -54,6 +55,13 @@
         <ol id="rankingList"></ol>
       </form>
     </section>
+
+    <dialog id="rankingView">
+      <h2>ランキング</h2>
+      <p>端末内に保存されたランキングを閲覧できます。</p>
+      <ol id="rankingViewList"></ol>
+      <button id="closeRankingView">閉じる</button>
+    </dialog>
 
     <dialog id="scoreDialog">
       <h2>役点数一覧</h2>

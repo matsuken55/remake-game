@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { awardJokers, createDie, createEmptyBoard, createInitialState, evaluateBoard, evaluateDice, getGroups, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, moveDie, placeDie, rollDice, saveRanking } from '../src/game.js';
+import { awardJokers, createDie, createEmptyBoard, createInitialState, evaluateBoard, evaluateDice, getGroups, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, moveDie, placeDie, rollBalancedDice, rollDice, saveRanking, hasScoringCandidate } from '../src/game.js';
 
 test('board groups are 20: rows, columns, diagonals, blocks, corners', () => {
   const groups = getGroups();
@@ -90,4 +90,14 @@ test('board evaluation can be limited to groups touched by newly locked dice', (
   const locked = lockUnlockedDice(board);
   const matches = evaluateBoard(locked.board, locked.locked.map(d => d.id));
   assert.equal(matches.some(match => match.label === '横1'), false);
+});
+
+
+test('balanced ROLL ensures recent two batches contain a scoring candidate', () => {
+  const previous = [createDie('red', 1), createDie('blue', 2), createDie('yellow', 3), createDie('green', 1)];
+  const randomValues = Array.from({ length: 100 * 8 }, () => 0.01);
+  const random = () => randomValues.shift() ?? 0.01;
+  const batch = rollBalancedDice(previous, random);
+  assert.equal(batch.length, 4);
+  assert.equal(hasScoringCandidate([...previous, ...batch]), true);
 });

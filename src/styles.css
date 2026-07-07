@@ -3,3 +3,5 @@
 
 .bgm-status{flex:1 1 100%;margin:0;color:#fca5a5;font-size:.82rem}.bgm-status:empty{display:none}
 .high-score{font-size:1.12rem;color:#fde68a;text-shadow:0 0 10px #f59e0b55}.joker-countdown{margin:0;color:#dbeafe;font-size:.9rem;font-weight:800}.howto-list{display:grid;gap:.4rem;padding-left:1.2rem;line-height:1.45}
+
+.score-section{display:grid;gap:.45rem}.score-section h3{margin:.35rem 0 .05rem;color:#fde68a;font-size:.95rem}.score-section:first-child h3{margin-top:0}

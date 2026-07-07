@@ -63,12 +63,34 @@ test('joker works as a wildcard', () => {
   assert.equal(hand.id, 'same-color-straight');
 });
 
-test('ranking registration keeps top ten and can be stored in localStorage', () => {
-  const rankings = saveRanking([], 'AAA', 1200);
-  assert.deepEqual(rankings.map(r => [r.name, r.score]), [['AAA', 1200]]);
+
+test('joker can overwrite a locked normal die and is evaluated as a joker', () => {
+  let board = createEmptyBoard();
+  [createDie('red', 1), createDie('red', 2), createDie('red', 3), createDie('blue', 4)].forEach((die, c) => { board = placeDie(board, 0, c, die); });
+  board = lockUnlockedDice(board).board;
+  board = placeDie(board, 0, 3, createDie('joker', 0, true));
+  assert.equal(board[0][3].joker, true);
+  assert.equal(board[0][3].locked, false);
+  const locked = lockUnlockedDice(board);
+  const matches = evaluateBoard(locked.board, locked.locked.map(d => d.id));
+  assert.equal(matches.some(match => match.hand.id === 'same-color-straight'), true);
+});
+
+test('normal dice cannot overwrite locked cells', () => {
+  let board = createEmptyBoard();
+  board = placeDie(board, 0, 0, createDie('red', 1));
+  board = lockUnlockedDice(board).board;
+  assert.throws(() => placeDie(board, 0, 0, createDie('blue', 2)), /occupied/);
+});
+
+test('ranking registration keeps top fifteen and can be stored in localStorage', () => {
+  const seed = Array.from({ length: 16 }, (_, i) => ({ name: `P${i}`, score: 1000 - i, date: '' }));
+  const rankings = saveRanking(seed, 'AAA', 1200);
+  assert.equal(rankings.length, 15);
+  assert.equal(rankings.some(r => r.name === 'AAA'), true);
   const fakeStorage = new Map();
   fakeStorage.set('rankings', JSON.stringify(rankings));
-  assert.equal(JSON.parse(fakeStorage.get('rankings'))[0].score, 1200);
+  assert.equal(JSON.parse(fakeStorage.get('rankings')).length, 15);
 });
 
 test('full board without clearing match has no empty cell and can be game over', () => {

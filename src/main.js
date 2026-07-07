@@ -117,8 +117,48 @@ function cancelDrag() { cleanupDrag(); state.dragging = null; render(); }
 function dropDie(e) { e.preventDefault?.(); e.stopPropagation?.(); cleanupDrag(); const drag = state.dragging; if (!drag) return; const cell = nearestCell(e.clientX, e.clientY); if (cell) { const r = Number(cell.dataset.row), c = Number(cell.dataset.col); const occupied = state.board[r][c]; const same = occupied?.id === drag.id; if (!occupied || same || (drag.die.joker && occupied.locked && !occupied.joker)) { removeFromBoard(drag.id); state.board = placeDie(state.board, r, c, drag.die); if (drag.fromJoker) state.jokerStock--; state.message = '未固定サイコロは確定で固定されます。'; } } state.dragging = null; render(); }
 function removeFromBoard(id) { for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (state.board[r][c]?.id === id && !state.board[r][c].locked) state.board[r][c] = null; }
 async function roll() { if (state.animating || state.gameOver) return; const hasStock = state.trayDice.some(d => !isOnBoard(d.id)); const unlocked = state.board.flat().filter(d => d && !d.locked); if (!hasStock && unlocked.length === 0) { state.trayDice = rollBalancedDice(state.previousBatchDice); playSound('refill'); state.previousBatchDice = state.trayDice.map(d => ({ ...d })); state.message = 'ストックを盤面へドラッグしてください。'; render(); return; } if (unlocked.length === 0) { state.message = 'サイコロを配置してください'; render(); return; } const locked = lockUnlockedDice(state.board); if (locked.locked.length > 0) playSound('lock'); state.board = locked.board; state.trayDice = state.trayDice.filter(d => !locked.locked.some(x => x.id === d.id)); await resolveMatches(locked.locked.map(d => d.id)); if (state.trayDice.length === 0 && !state.gameOver) state.message = 'ストック完了。次は補充で新しい4個を生成します。'; render(); }
-async function resolveMatches(lockedIds) { state.animating = true; render(); const matches = evaluateBoard(state.board, lockedIds); let cleared = false; for (const match of matches) { await showMatch(match); state.score += match.hand.points; const beforeJokerStock = state.jokerStock; Object.assign(state, awardJokers(state, match.hand.points)); if (state.jokerStock > beforeJokerStock) playSound('joker'); if (match.hand.clearing) { playSound('erase'); cleared = true; for (const [r,c] of match.cells) state.board[r][c] = null; } addLog(`${formatSignedPoints(match.hand.points)} ${match.label} ${match.hand.name}`); render(); await wait(120); } state.highScore = Math.max(state.highScore, state.score); saveHighScore(state.mode, state.highScore); state.animating = false; if (matches.length === 0) addLog('役なし'); if (!cleared && !hasEmptyCell(state.board)) endGame(); }
+async function resolveMatches(lockedIds) {
+  state.animating = true;
+  render();
+  const matches = evaluateBoard(state.board, lockedIds);
+  const clearingCellKeys = new Set();
+  const totalPoints = matches.reduce((sum, match) => sum + match.hand.points, 0);
+
+  for (const match of matches) {
+    if (match.hand.clearing) for (const [r,c] of match.cells) clearingCellKeys.add(`${r},${c}`);
+    await showMatch(match);
+    addLog(`${formatSignedPoints(match.hand.points)} ${match.label} ${match.hand.name}`);
+    render();
+    await wait(120);
+  }
+
+  if (totalPoints > 0) {
+    state.score += totalPoints;
+    const beforeJokerStock = state.jokerStock;
+    Object.assign(state, awardJokers(state, totalPoints));
+    if (state.jokerStock > beforeJokerStock) playSound('joker');
+  }
+
+  const cleared = clearingCellKeys.size > 0;
+  if (cleared) {
+    await showClearingCells(clearingCellKeys);
+    playSound('erase');
+    for (const key of clearingCellKeys) {
+      const [r, c] = key.split(',').map(Number);
+      state.board[r][c] = null;
+    }
+    render();
+    await wait(120);
+  }
+
+  state.highScore = Math.max(state.highScore, state.score);
+  saveHighScore(state.mode, state.highScore);
+  state.animating = false;
+  if (matches.length === 0) addLog('役なし');
+  if (!cleared && !hasEmptyCell(state.board)) endGame();
+}
 function showMatch(match) { return new Promise(resolve => { const cells = match.cells.map(([r,c]) => boardEl.children[r*4+c]).filter(Boolean); cells.forEach(cell => cell.classList.add('flash')); showScorePopup(match, formatSignedPoints(match.hand.points)); msgEl.textContent = `${formatSignedPoints(match.hand.points)} ${match.hand.name}`; setTimeout(resolve, 520); }); }
+function showClearingCells(cellKeys) { return new Promise(resolve => { cellKeys.forEach(key => { const [r, c] = key.split(',').map(Number); boardEl.children[r*4+c]?.classList.add('flash'); }); msgEl.textContent = '成立した役のサイコロをまとめて消去します'; setTimeout(resolve, 360); }); }
 function showScorePopup(match, text) { const popup = document.createElement('div'); popup.className = 'score-popup'; popup.textContent = text; const boardRect = boardEl.getBoundingClientRect(); const centers = match.cells.map(([r,c]) => { const rect = boardEl.children[r*4+c].getBoundingClientRect(); return { x: rect.left + rect.width / 2 - boardRect.left, y: rect.top + rect.height / 2 - boardRect.top }; }); popup.style.left = `${centers.reduce((sum, p) => sum + p.x, 0) / centers.length}px`; popup.style.top = `${centers.reduce((sum, p) => sum + p.y, 0) / centers.length}px`; boardEl.appendChild(popup); setTimeout(() => popup.remove(), 520); }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function addLog(text) { console.info(`[game] ${text}`); }

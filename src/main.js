@@ -1,102 +1,40 @@
-import { BOARD_SIZE, COLOR_LABELS, createEmptyBoard, evaluateBoard, rollDice, placeDie } from './game.js';
+import { ALL_HANDS, BOARD_SIZE, COLOR_CODES, COLOR_LABELS, createInitialState, createJoker, evaluateBoard, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, placeDie, rollDice, saveRanking, awardJokers } from './game.js';
 
-const state = {
-  board: createEmptyBoard(),
-  tray: [],
-  selected: null,
-  score: 0,
-  message: 'ROLLで4つのサイコロを生成してください。',
-  canRoll: true,
-};
+const storage = { high: 'remakeDice.highScore', ranks: 'remakeDice.rankings' };
+const state = createInitialState();
+Object.assign(state, { highScore: Number(localStorage.getItem(storage.high) || 0), rankings: JSON.parse(localStorage.getItem(storage.ranks) || '[]'), animating: false, dragging: null });
 
-const boardEl = document.querySelector('#board');
-const trayEl = document.querySelector('#tray');
-const rollButton = document.querySelector('#roll');
-const scoreEl = document.querySelector('#score');
-const messageEl = document.querySelector('#message');
-const logEl = document.querySelector('#log');
+const $ = s => document.querySelector(s);
+const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), logEl = $('#log'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rulesDialog = $('#scoreDialog');
+overEl.hidden = true;
 
+function asset(die) { return die.joker ? 'assets/dice/JK.png' : `assets/dice/${COLOR_CODES[die.color]}${die.number}.png`; }
+function dieElement(die) { const el = document.createElement('div'); el.className = `die ${die.color} ${die.locked ? 'locked' : 'unlocked'} ${die.joker ? 'joker' : ''}`; el.dataset.id = die.id; const img = document.createElement('img'); img.src = asset(die); img.alt = die.joker ? 'ジョーカー' : `${COLOR_LABELS[die.color]}${die.number}`; el.appendChild(img); if (die.locked) el.insertAdjacentHTML('beforeend', '<span class="lock">🔒</span>'); return el; }
 function render() {
   boardEl.innerHTML = '';
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      const cell = document.createElement('button');
-      cell.className = 'cell';
-      cell.dataset.row = r;
-      cell.dataset.col = c;
-      const die = state.board[r][c];
-      if (die) cell.appendChild(dieElement(die));
-      cell.disabled = Boolean(die) || state.selected === null;
-      cell.addEventListener('click', () => placeSelected(r, c));
-      boardEl.appendChild(cell);
-    }
-  }
-
-  trayEl.innerHTML = '';
-  state.tray.forEach((die, index) => {
-    const button = document.createElement('button');
-    button.className = `tray-die ${state.selected === index ? 'selected' : ''}`;
-    button.appendChild(dieElement(die));
-    button.addEventListener('click', () => {
-      state.selected = state.selected === index ? null : index;
-      render();
-    });
-    trayEl.appendChild(button);
-  });
-
-  rollButton.disabled = !state.canRoll;
-  scoreEl.textContent = state.score;
-  messageEl.textContent = state.message;
-}
-
-function dieElement(die) {
-  const el = document.createElement('span');
-  el.className = `die ${die.color}`;
-  el.textContent = die.joker ? '★' : `${COLOR_LABELS[die.color]}${die.number}`;
-  el.title = die.joker ? 'ジョーカー（ワイルド）' : `${COLOR_LABELS[die.color]} ${die.number}`;
-  return el;
-}
-
-function roll() {
-  if (!state.canRoll) return;
-  state.tray = rollDice();
-  state.selected = null;
-  state.canRoll = false;
-  state.message = '4つすべてを空きマスに配置してください。';
-  render();
-}
-
-function placeSelected(row, col) {
-  if (state.selected === null) return;
-  const die = state.tray[state.selected];
-  state.board = placeDie(state.board, row, col, die);
-  state.tray.splice(state.selected, 1);
-  state.selected = null;
-  if (state.tray.length === 0) resolveTurn();
-  else state.message = `残り${state.tray.length}個を配置してください。`;
-  render();
-}
-
-function resolveTurn() {
-  const result = evaluateBoard(state.board);
-  state.board = result.nextBoard;
-  state.score += result.score;
-  state.canRoll = true;
-  if (result.matches.length === 0) {
-    state.message = '役なし。次のROLLが可能です。';
-    addLog('役なし');
-  } else {
-    const names = result.matches.map(m => m.hand.name).join(' / ');
-    state.message = `${result.matches.length}役成立: ${names}。次のROLLが可能です。`;
-    addLog(`+${result.score}: ${names}`);
-  }
-}
-
-function addLog(text) {
-  const item = document.createElement('li');
-  item.textContent = text;
-  logEl.prepend(item);
-}
-
+  for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) { const cell = document.createElement('div'); cell.className = 'cell'; cell.dataset.row = r; cell.dataset.col = c; const die = state.board[r][c]; if (die) { const d = dieElement(die); if (!die.locked && !state.animating) d.addEventListener('pointerdown', startDrag); cell.appendChild(d); } boardEl.appendChild(cell); }
+  trayEl.innerHTML = ''; state.trayDice.filter(d => !isOnBoard(d.id)).forEach(die => { const slot = document.createElement('div'); slot.className = 'tray-slot'; const d = dieElement(die); if (!state.animating) d.addEventListener('pointerdown', startDrag); slot.appendChild(d); trayEl.appendChild(slot); });
+  jokerEl.innerHTML = ''; for (let i=0;i<MAX_JOKERS;i++) { const slot = document.createElement('div'); slot.className = `joker-slot ${i < state.jokerStock ? 'filled' : ''}`; if (i < state.jokerStock) { const img = document.createElement('img'); img.src = 'assets/dice/JK.png'; img.alt = 'ジョーカー'; slot.appendChild(img); } else slot.textContent = '—'; if (i < state.jokerStock && !state.animating) slot.addEventListener('pointerdown', e => startDrag(e, createJoker())); jokerEl.appendChild(slot); }
+  scoreEl.textContent = state.score; highScoreEl.textContent = state.highScore; countEl.textContent = state.jokerStock >= MAX_JOKERS ? 'MAX' : state.jokerCountdown; msgEl.textContent = state.message; rollButton.disabled = state.animating || state.gameOver; renderRankings(); }
+function isOnBoard(id) { return state.board.flat().some(d => d?.id === id); }
+function startDrag(event, newDie = null) { if (state.animating || state.gameOver) return; const original = event.currentTarget; const id = newDie?.id || original.dataset.id; state.dragging = { id, die: newDie || findDie(id), fromJoker: Boolean(newDie), ghost: original.cloneNode(true) }; state.dragging.ghost.classList.add('dragging'); document.body.appendChild(state.dragging.ghost); original.setPointerCapture?.(event.pointerId); moveGhost(event); window.addEventListener('pointermove', moveGhost); window.addEventListener('pointerup', dropDie, { once: true }); }
+function findDie(id) { return state.trayDice.find(d => d.id === id) || state.board.flat().find(d => d?.id === id); }
+function moveGhost(e) { if (!state.dragging) return; state.dragging.ghost.style.left = `${e.clientX - 38}px`; state.dragging.ghost.style.top = `${e.clientY - 38}px`; }
+function nearestCell(x, y) { let best = null, dist = Infinity; document.querySelectorAll('.cell').forEach(cell => { const rect = cell.getBoundingClientRect(); const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2; const d = Math.hypot(cx - x, cy - y); if (d < dist) { dist = d; best = cell; } }); return dist < 95 ? best : null; }
+function dropDie(e) { window.removeEventListener('pointermove', moveGhost); const drag = state.dragging; if (!drag) return; drag.ghost.remove(); const cell = nearestCell(e.clientX, e.clientY); if (cell) { const r = Number(cell.dataset.row), c = Number(cell.dataset.col); const occupied = state.board[r][c]; const same = occupied?.id === drag.id; if (!occupied || same) { removeFromBoard(drag.id); state.board = placeDie(state.board, r, c, drag.die); if (drag.fromJoker) state.jokerStock--; state.message = '未固定サイコロはROLLで固定されます。'; } } state.dragging = null; render(); }
+function removeFromBoard(id) { for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (state.board[r][c]?.id === id && !state.board[r][c].locked) state.board[r][c] = null; }
+async function roll() { if (state.animating || state.gameOver) return; if (state.trayDice.length === 0) { state.trayDice = rollDice(); state.message = '現在のバッチを盤面へドラッグしてください。'; render(); return; } const unlocked = state.board.flat().filter(d => d && !d.locked); if (unlocked.length === 0) { state.message = 'サイコロを盤面に配置してください'; render(); return; } const locked = lockUnlockedDice(state.board); state.board = locked.board; state.trayDice = state.trayDice.filter(d => !locked.locked.some(x => x.id === d.id)); await resolveMatches(); if (state.trayDice.length === 0 && !state.gameOver) state.message = 'バッチ完了。次のROLLで新しい4個を生成します。'; render(); }
+async function resolveMatches() { state.animating = true; render(); const matches = evaluateBoard(state.board); let cleared = false; for (const match of matches) { await showMatch(match); state.score += match.hand.points; Object.assign(state, awardJokers(state, match.hand.points)); if (match.hand.clearing) { cleared = true; for (const [r,c] of match.cells) state.board[r][c] = null; } addLog(`+${match.hand.points} ${match.label} ${match.hand.name}`); render(); await wait(180); } state.highScore = Math.max(state.highScore, state.score); localStorage.setItem(storage.high, String(state.highScore)); state.animating = false; if (matches.length === 0) addLog('役なし'); if (!cleared && !hasEmptyCell(state.board)) endGame(); }
+function showMatch(match) { return new Promise(resolve => { match.cells.forEach(([r,c]) => boardEl.children[r*4+c]?.classList.add('flash')); msgEl.textContent = `+${match.hand.points} ${match.hand.name}`; setTimeout(resolve, 1000); }); }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function addLog(text) { const li = document.createElement('li'); li.textContent = text; logEl.prepend(li); }
+function endGame() { state.gameOver = true; overEl.hidden = false; state.message = 'ゲームオーバー。ランキングに登録してください。'; }
+function renderRankings() { rankingEl.innerHTML = ''; state.rankings.forEach((r,i) => { const li = document.createElement('li'); li.textContent = `${i+1}. ${r.name} ${r.score}`; rankingEl.appendChild(li); }); }
+function restartGame() { const ranks = state.rankings, high = state.highScore; Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false, dragging: null }); overEl.hidden = true; render(); }
+$('#rankForm').addEventListener('submit', e => { e.preventDefault(); state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score); localStorage.setItem(storage.ranks, JSON.stringify(state.rankings)); restartGame(); });
+$('#restart').addEventListener('click', restartGame);
+$('#closeGameOver').addEventListener('click', restartGame);
+$('#rules').addEventListener('click', () => rulesDialog.showModal());
+$('#closeRules').addEventListener('click', () => rulesDialog.close());
 rollButton.addEventListener('click', roll);
 render();

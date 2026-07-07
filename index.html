@@ -16,7 +16,8 @@
     <section class="status top-status" aria-label="スコア情報">
       <strong>Score: <span id="score">0</span></strong>
       <strong>High: <span id="highScore">0</span></strong>
-      <strong>Jokerまで: <span id="jokerCountdown">800</span></strong>
+      <strong class="mode-badge">MODE: <span id="modeLabel">NORMAL</span></strong>
+      <strong>Jokerまで: <span id="jokerCountdown">400</span></strong>
       <p id="message"></p>
     </section>
 
@@ -44,6 +45,18 @@
       <button id="rankingButton">ランキング</button>
     </section>
 
+    <section id="startScreen" class="overlay start-overlay" aria-hidden="false">
+      <div class="game-over start-card">
+        <h2>モード選択</h2>
+        <p>Normalはジョーカー400ポイント、Easyは280ポイントで補給されます。</p>
+        <div class="mode-select" role="radiogroup" aria-label="ゲームモード">
+          <label><input type="radio" name="gameMode" value="normal" checked> Normal</label>
+          <label><input type="radio" name="gameMode" value="easy"> Easy</label>
+        </div>
+        <button id="startGame" type="button">ゲーム開始</button>
+      </div>
+    </section>
+
     <section id="gameOver" class="overlay" hidden aria-hidden="true" style="display:none">
       <form id="rankForm" class="game-over">
         <h2>ゲームオーバー</h2>
@@ -59,6 +72,10 @@
     <dialog id="rankingView">
       <h2>ランキング</h2>
       <p>端末内に保存されたランキングを閲覧できます。</p>
+      <div class="ranking-tabs" role="group" aria-label="ランキングモード">
+        <button id="rankingNormal" type="button">Normal</button>
+        <button id="rankingEasy" type="button">Easy</button>
+      </div>
       <ol id="rankingViewList"></ol>
       <button id="closeRankingView">閉じる</button>
     </dialog>

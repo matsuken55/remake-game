@@ -45,14 +45,14 @@ test('unlocked dice can move but locked dice cannot move', () => {
   assert.equal(moved.board[1][1].id, die.id);
 });
 
-test('joker is awarded every 800 points and capped at two', () => {
-  let state = { jokerStock: 0, jokerCountdown: 800 };
-  state = awardJokers(state, 799);
+test('normal joker is awarded every 400 points and capped at two', () => {
+  let state = createInitialState('normal');
+  state = awardJokers(state, 399);
   assert.equal(state.jokerStock, 0);
   assert.equal(state.jokerCountdown, 1);
   state = awardJokers(state, 1);
   assert.equal(state.jokerStock, 1);
-  assert.equal(state.jokerCountdown, 800);
+  assert.equal(state.jokerCountdown, 400);
   state = awardJokers(state, 2000);
   assert.equal(state.jokerStock, MAX_JOKERS);
   assert.equal(state.jokerCountdown, 0);
@@ -100,4 +100,14 @@ test('balanced ROLL ensures recent two batches contain a scoring candidate', () 
   const batch = rollBalancedDice(previous, random);
   assert.equal(batch.length, 4);
   assert.equal(hasScoringCandidate([...previous, ...batch]), true);
+});
+
+test('easy mode uses a 280 point joker threshold', () => {
+  let state = createInitialState('easy');
+  assert.equal(state.mode, 'easy');
+  assert.equal(state.jokerThreshold, 280);
+  assert.equal(state.jokerCountdown, 280);
+  state = awardJokers(state, 280);
+  assert.equal(state.jokerStock, 1);
+  assert.equal(state.jokerCountdown, 280);
 });

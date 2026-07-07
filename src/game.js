@@ -29,7 +29,7 @@ export function createEmptyBoard() { return Array.from({ length: BOARD_SIZE }, (
 export function createDie(color, number, joker = false) { return { id: `die-${nextId++}`, color: joker ? 'joker' : color, number: joker ? 0 : number, joker, locked: false, source: 'batch' }; }
 export function createJoker() { return { ...createDie('joker', 0, true), source: 'joker' }; }
 export function rollDice(random = Math.random) { return Array.from({ length: 4 }, () => createDie(COLORS[Math.floor(random() * COLORS.length)], NUMBERS[Math.floor(random() * NUMBERS.length)])); }
-export function createInitialState() { return { board: createEmptyBoard(), trayDice: [], jokerStock: 0, jokerCountdown: JOKER_THRESHOLD, score: 0, highScore: 0, rankings: [], gameOver: false, message: 'ROLLで4つのサイコロを生成してください。' }; }
+export function createInitialState() { return { board: createEmptyBoard(), trayDice: [], previousBatchDice: [], jokerStock: 0, jokerCountdown: JOKER_THRESHOLD, score: 0, highScore: 0, rankings: [], gameOver: false, message: 'ROLLで4つのサイコロを生成してください。' }; }
 
 export function getGroups() {
   const groups = [];
@@ -56,6 +56,22 @@ const predicates = {
   straight: isStraight,
 };
 export function evaluateDice(dice) { if (dice.length !== 4) return null; for (const hand of ALL_HANDS) if (canAssign(dice, predicates[hand.id])) return { ...hand, clearing: CLEARING_HANDS.some(h => h.id === hand.id) }; return null; }
+export function hasScoringCandidate(dice) {
+  if (dice.length < 4) return false;
+  for (let a = 0; a < dice.length - 3; a++) for (let b = a + 1; b < dice.length - 2; b++) for (let c = b + 1; c < dice.length - 1; c++) for (let d = c + 1; d < dice.length; d++) {
+    if (evaluateDice([dice[a], dice[b], dice[c], dice[d]])) return true;
+  }
+  return false;
+}
+export function rollBalancedDice(previousBatch = [], random = Math.random) {
+  if (!previousBatch.length) return rollDice(random);
+  for (let tries = 0; tries < 100; tries++) {
+    const batch = rollDice(random);
+    if (hasScoringCandidate([...previousBatch, ...batch])) return batch;
+  }
+  const numbers = [1, 2, 3, 4];
+  return numbers.map(number => createDie('red', number));
+}
 export function evaluateBoard(board, triggeringIds = null) { const matches = []; const triggerSet = triggeringIds ? new Set(triggeringIds) : null; for (const group of getGroups()) { const dice = group.cells.map(([r,c]) => board[r][c]); const hasTrigger = triggerSet ? dice.some(d => d && triggerSet.has(d.id)) : dice.some(d => d?.locked); if (dice.every(Boolean) && hasTrigger) { const hand = evaluateDice(dice); if (hand) matches.push({ ...group, hand }); } } return matches; }
 export function cloneBoard(board) { return board.map(row => row.map(cell => cell ? { ...cell } : null)); }
 export function moveDie(board, dieId, row, col) { const next = cloneBoard(board); let die = null; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c]?.id === dieId) { if (next[r][c].locked) return { board, moved: false }; die = next[r][c]; next[r][c] = null; } if (next[row][col]) return { board, moved: false }; next[row][col] = die; return { board: next, moved: true }; }

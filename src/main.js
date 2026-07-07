@@ -8,7 +8,7 @@ let registeredGameOverId = null;
 Object.assign(state, { highScore: loadHighScore(), rankings: loadRankings(), animating: false, dragging: null, rankRegistered: false });
 
 const $ = s => document.querySelector(s);
-const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), logEl = $('#log'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rulesDialog = $('#scoreDialog'), gameOverRestartButton = $('#gameOverRestart');
+const boardEl = $('#board'), trayEl = $('#tray'), rollButton = $('#roll'), scoreEl = $('#score'), highScoreEl = $('#highScore'), msgEl = $('#message'), jokerEl = $('#jokerWindow'), countEl = $('#jokerCountdown'), overEl = $('#gameOver'), rankingEl = $('#rankingList'), rulesDialog = $('#scoreDialog'), gameOverRestartButton = $('#gameOverRestart'), scoreExamplesEl = $('#scoreExamples');
 
 function loadHighScore() { return Number(localStorage.getItem(storage.high) || 0); }
 function loadRankings() { try { const rankings = JSON.parse(localStorage.getItem(storage.ranks) || '[]'); return Array.isArray(rankings) ? rankings : []; } catch { return []; } }
@@ -27,39 +27,21 @@ function moveGhost(e) { if (!state.dragging) return; state.dragging.ghost.style.
 function nearestCell(x, y) { let best = null, dist = Infinity; document.querySelectorAll('.cell').forEach(cell => { const rect = cell.getBoundingClientRect(); const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2; const d = Math.hypot(cx - x, cy - y); if (d < dist) { dist = d; best = cell; } }); return dist < 95 ? best : null; }
 function dropDie(e) { window.removeEventListener('pointermove', moveGhost); const drag = state.dragging; if (!drag) return; drag.ghost.remove(); const cell = nearestCell(e.clientX, e.clientY); if (cell) { const r = Number(cell.dataset.row), c = Number(cell.dataset.col); const occupied = state.board[r][c]; const same = occupied?.id === drag.id; if (!occupied || same) { removeFromBoard(drag.id); state.board = placeDie(state.board, r, c, drag.die); if (drag.fromJoker) state.jokerStock--; state.message = '未固定サイコロはROLLで固定されます。'; } } state.dragging = null; render(); }
 function removeFromBoard(id) { for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (state.board[r][c]?.id === id && !state.board[r][c].locked) state.board[r][c] = null; }
-async function roll() { if (state.animating || state.gameOver) return; if (state.trayDice.length === 0) { state.trayDice = rollDice(); state.message = '現在のバッチを盤面へドラッグしてください。'; render(); return; } const unlocked = state.board.flat().filter(d => d && !d.locked); if (unlocked.length === 0) { state.message = 'サイコロを盤面に配置してください'; render(); return; } const locked = lockUnlockedDice(state.board); state.board = locked.board; state.trayDice = state.trayDice.filter(d => !locked.locked.some(x => x.id === d.id)); await resolveMatches(); if (state.trayDice.length === 0 && !state.gameOver) state.message = 'バッチ完了。次のROLLで新しい4個を生成します。'; render(); }
-async function resolveMatches() { state.animating = true; render(); const matches = evaluateBoard(state.board); let cleared = false; for (const match of matches) { await showMatch(match); state.score += match.hand.points; Object.assign(state, awardJokers(state, match.hand.points)); if (match.hand.clearing) { cleared = true; for (const [r,c] of match.cells) state.board[r][c] = null; } addLog(`+${match.hand.points} ${match.label} ${match.hand.name}`); render(); await wait(180); } state.highScore = Math.max(state.highScore, state.score); localStorage.setItem(storage.high, String(state.highScore)); state.animating = false; if (matches.length === 0) addLog('役なし'); if (!cleared && !hasEmptyCell(state.board)) endGame(); }
-function showMatch(match) { return new Promise(resolve => { match.cells.forEach(([r,c]) => boardEl.children[r*4+c]?.classList.add('flash')); msgEl.textContent = `+${match.hand.points} ${match.hand.name}`; setTimeout(resolve, 1000); }); }
+async function roll() { if (state.animating || state.gameOver) return; if (state.trayDice.length === 0) { state.trayDice = rollDice(); state.message = '現在のバッチを盤面へドラッグしてください。'; render(); return; } const unlocked = state.board.flat().filter(d => d && !d.locked); if (unlocked.length === 0) { state.message = 'サイコロを盤面に配置してください'; render(); return; } const locked = lockUnlockedDice(state.board); state.board = locked.board; state.trayDice = state.trayDice.filter(d => !locked.locked.some(x => x.id === d.id)); await resolveMatches(locked.locked.map(d => d.id)); if (state.trayDice.length === 0 && !state.gameOver) state.message = 'バッチ完了。次のROLLで新しい4個を生成します。'; render(); }
+async function resolveMatches(lockedIds) { state.animating = true; render(); const matches = evaluateBoard(state.board, lockedIds); let cleared = false; for (const match of matches) { await showMatch(match); state.score += match.hand.points; Object.assign(state, awardJokers(state, match.hand.points)); if (match.hand.clearing) { cleared = true; for (const [r,c] of match.cells) state.board[r][c] = null; } addLog(`+${match.hand.points} ${match.label} ${match.hand.name}`); render(); await wait(120); } state.highScore = Math.max(state.highScore, state.score); localStorage.setItem(storage.high, String(state.highScore)); state.animating = false; if (matches.length === 0) addLog('役なし'); if (!cleared && !hasEmptyCell(state.board)) endGame(); }
+function showMatch(match) { return new Promise(resolve => { const cells = match.cells.map(([r,c]) => boardEl.children[r*4+c]).filter(Boolean); cells.forEach(cell => cell.classList.add('flash')); showScorePopup(match, `+${match.hand.points}`); msgEl.textContent = `+${match.hand.points} ${match.hand.name}`; setTimeout(resolve, 520); }); }
+function showScorePopup(match, text) { const popup = document.createElement('div'); popup.className = 'score-popup'; popup.textContent = text; const boardRect = boardEl.getBoundingClientRect(); const centers = match.cells.map(([r,c]) => { const rect = boardEl.children[r*4+c].getBoundingClientRect(); return { x: rect.left + rect.width / 2 - boardRect.left, y: rect.top + rect.height / 2 - boardRect.top }; }); popup.style.left = `${centers.reduce((sum, p) => sum + p.x, 0) / centers.length}px`; popup.style.top = `${centers.reduce((sum, p) => sum + p.y, 0) / centers.length}px`; boardEl.appendChild(popup); setTimeout(() => popup.remove(), 520); }
 const wait = ms => new Promise(r => setTimeout(r, ms));
-function addLog(text) { const li = document.createElement('li'); li.textContent = text; logEl.prepend(li); }
+function addLog(text) { console.info(`[game] ${text}`); }
 function closeGameOverModal() { overEl.hidden = true; overEl.setAttribute?.('aria-hidden', 'true'); overEl.style.display = 'none'; }
 function openGameOverModal() { overEl.hidden = false; overEl.setAttribute?.('aria-hidden', 'false'); overEl.style.display = ''; }
 function endGame() { state.gameOver = true; state.rankRegistered = false; activeGameOverId = ++gameOverSequence; openGameOverModal(); state.message = 'ゲームオーバー。ランキングに登録してください。'; render(); }
 function renderRankings() { rankingEl.innerHTML = ''; state.rankings.forEach((r,i) => { const li = document.createElement('li'); li.textContent = `${i+1}. ${r.name} ${r.score}`; rankingEl.appendChild(li); }); }
-function startNewGame() {
-  state.dragging?.ghost?.remove?.();
-  closeGameOverModal();
-  const ranks = state.rankings, high = state.highScore;
-  Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false, dragging: null, rankRegistered: false });
-  activeGameOverId = null;
-  $('#playerName').value = '';
-  render();
-}
+function renderScoreExamples() { const examples = { 'same-color-same-number': ['r1','r1','r1','r1'], 'same-color-straight': ['b1','b2','b3','b4'], 'rainbow-same-number': ['r2','b2','y2','g2'], 'rainbow-straight': ['r1','b2','y3','g4'], 'same-color': ['g1','g2','g3','g4'], 'same-number': ['r4','b4','y4','g4'], 'two-color-pairs': ['r1','r3','b2','b4'], 'two-number-pairs': ['r1','b1','y3','g3'], rainbow: ['r1','b3','y2','g4'], straight: ['r1','b2','y3','g4'] }; scoreExamplesEl.innerHTML = ''; ALL_HANDS.forEach(hand => { const row = document.createElement('div'); row.className = 'score-row'; const dice = document.createElement('div'); dice.className = 'mini-dice'; examples[hand.id].forEach(name => { const img = document.createElement('img'); img.src = `assets/dice/${name}.png`; img.alt = name; dice.appendChild(img); }); const label = document.createElement('strong'); label.textContent = hand.name; const meta = document.createElement('span'); meta.textContent = `${hand.points}点 / ${hand.clearing || ['same-color-same-number','same-color-straight','rainbow-same-number','rainbow-straight'].includes(hand.id) ? '消える' : '消えない'}`; row.appendChild(dice); row.appendChild(label); row.appendChild(meta); scoreExamplesEl.appendChild(row); }); }
+function startNewGame() { state.dragging?.ghost?.remove?.(); closeGameOverModal(); const ranks = state.rankings, high = state.highScore; Object.assign(state, createInitialState(), { rankings: ranks, highScore: high, animating: false, dragging: null, rankRegistered: false }); activeGameOverId = null; $('#playerName').value = ''; render(); }
 const resetToNewGame = startNewGame;
-function restartGame(event) {
-  event?.preventDefault?.();
-  event?.stopPropagation?.();
-  resetToNewGame();
-}
-function registerRanking(event) {
-  event.preventDefault();
-  if (!state.gameOver || overEl.hidden || state.rankRegistered || activeGameOverId === null || registeredGameOverId === activeGameOverId) return;
-  state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score);
-  localStorage.setItem(storage.ranks, JSON.stringify(state.rankings));
-  state.rankRegistered = true;
-  registeredGameOverId = activeGameOverId;
-  resetToNewGame();
-}
+function restartGame(event) { event?.preventDefault?.(); event?.stopPropagation?.(); resetToNewGame(); }
+function registerRanking(event) { event.preventDefault(); if (!state.gameOver || overEl.hidden || state.rankRegistered || activeGameOverId === null || registeredGameOverId === activeGameOverId) return; state.rankings = saveRanking(state.rankings, $('#playerName').value, state.score); localStorage.setItem(storage.ranks, JSON.stringify(state.rankings)); state.rankRegistered = true; registeredGameOverId = activeGameOverId; resetToNewGame(); }
 $('#rankForm').addEventListener('submit', registerRanking);
 $('#restart').addEventListener('click', restartGame);
 gameOverRestartButton.addEventListener('click', restartGame);
@@ -67,6 +49,7 @@ overEl.addEventListener('click', event => { if (event.target?.id === 'gameOverRe
 $('#rules').addEventListener('click', () => rulesDialog.showModal());
 $('#closeRules').addEventListener('click', () => rulesDialog.close());
 rollButton.addEventListener('click', roll);
+renderScoreExamples();
 startNewGame();
 
 export const __testing = { state, endGame, restartGame, registerRanking, startNewGame };

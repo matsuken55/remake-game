@@ -79,3 +79,15 @@ test('full board without clearing match has no empty cell and can be game over',
   assert.equal(hasEmptyCell(board), false);
   assert.ok(Array.isArray(evaluateBoard(board)));
 });
+
+test('board evaluation can be limited to groups touched by newly locked dice', () => {
+  let board = createEmptyBoard();
+  const oldDice = [createDie('red', 1), createDie('red', 1), createDie('red', 1), createDie('red', 1)];
+  oldDice.forEach((die, c) => { board = placeDie(board, 0, c, die); });
+  board = lockUnlockedDice(board).board;
+  const newDie = createDie('blue', 2);
+  board = placeDie(board, 3, 3, newDie);
+  const locked = lockUnlockedDice(board);
+  const matches = evaluateBoard(locked.board, locked.locked.map(d => d.id));
+  assert.equal(matches.some(match => match.label === '横1'), false);
+});

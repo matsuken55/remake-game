@@ -56,7 +56,7 @@ const predicates = {
   straight: isStraight,
 };
 export function evaluateDice(dice) { if (dice.length !== 4) return null; for (const hand of ALL_HANDS) if (canAssign(dice, predicates[hand.id])) return { ...hand, clearing: CLEARING_HANDS.some(h => h.id === hand.id) }; return null; }
-export function evaluateBoard(board) { const matches = []; for (const group of getGroups()) { const dice = group.cells.map(([r,c]) => board[r][c]); if (dice.every(Boolean) && dice.some(d => d.locked)) { const hand = evaluateDice(dice); if (hand) matches.push({ ...group, hand }); } } return matches; }
+export function evaluateBoard(board, triggeringIds = null) { const matches = []; const triggerSet = triggeringIds ? new Set(triggeringIds) : null; for (const group of getGroups()) { const dice = group.cells.map(([r,c]) => board[r][c]); const hasTrigger = triggerSet ? dice.some(d => d && triggerSet.has(d.id)) : dice.some(d => d?.locked); if (dice.every(Boolean) && hasTrigger) { const hand = evaluateDice(dice); if (hand) matches.push({ ...group, hand }); } } return matches; }
 export function cloneBoard(board) { return board.map(row => row.map(cell => cell ? { ...cell } : null)); }
 export function moveDie(board, dieId, row, col) { const next = cloneBoard(board); let die = null; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c]?.id === dieId) { if (next[r][c].locked) return { board, moved: false }; die = next[r][c]; next[r][c] = null; } if (next[row][col]) return { board, moved: false }; next[row][col] = die; return { board: next, moved: true }; }
 export function placeDie(board, row, col, die) { if (board[row][col]) throw new Error('Cell is already occupied'); const next = cloneBoard(board); next[row][col] = { ...die }; return next; }

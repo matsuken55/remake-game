@@ -1,9 +1,14 @@
 export const COLORS = ['red', 'blue', 'yellow', 'green'];
 export const NUMBERS = [1, 2, 3, 4];
 export const BOARD_SIZE = 4;
-export const GAME_MODES = { normal: { label: 'NORMAL', jokerThreshold: 400 }, easy: { label: 'EASY', jokerThreshold: 280 } };
+export const JOKER_THRESHOLDS = {
+  easy: [80, 130, 190, 260],
+  normal: [120, 200, 300, 420],
+};
+export const JOKER_THRESHOLD_INCREMENTS = { easy: 80, normal: 140 };
+export const GAME_MODES = { normal: { label: 'NORMAL' }, easy: { label: 'EASY' } };
 export const DEFAULT_MODE = 'normal';
-export const JOKER_THRESHOLD = GAME_MODES.normal.jokerThreshold;
+export const JOKER_THRESHOLD = JOKER_THRESHOLDS.normal[0];
 export const MAX_JOKERS = 2;
 
 export const COLOR_LABELS = { red: '赤', blue: '青', yellow: '黄', green: '緑', joker: 'J' };
@@ -31,7 +36,14 @@ export function createEmptyBoard() { return Array.from({ length: BOARD_SIZE }, (
 export function createDie(color, number, joker = false) { return { id: `die-${nextId++}`, color: joker ? 'joker' : color, number: joker ? 0 : number, joker, locked: false, source: 'batch' }; }
 export function createJoker() { return { ...createDie('joker', 0, true), source: 'joker' }; }
 export function rollDice(random = Math.random) { return Array.from({ length: 4 }, () => createDie(COLORS[Math.floor(random() * COLORS.length)], NUMBERS[Math.floor(random() * NUMBERS.length)])); }
-export function createInitialState(mode = DEFAULT_MODE) { const selectedMode = GAME_MODES[mode] ? mode : DEFAULT_MODE; const jokerThreshold = GAME_MODES[selectedMode].jokerThreshold; return { mode: selectedMode, jokerThreshold, board: createEmptyBoard(), trayDice: [], previousBatchDice: [], jokerStock: 0, jokerCountdown: jokerThreshold, score: 0, highScore: 0, rankings: [], gameOver: false, message: '補充で4つのサイコロをストックしてください。' }; }
+export function getNextJokerThreshold(mode = DEFAULT_MODE, jokerRefillCount = 0) {
+  const selectedMode = GAME_MODES[mode] ? mode : DEFAULT_MODE;
+  const thresholds = JOKER_THRESHOLDS[selectedMode];
+  const count = Math.max(0, Number(jokerRefillCount) || 0);
+  if (count < thresholds.length) return thresholds[count];
+  return thresholds[thresholds.length - 1] + (count - thresholds.length + 1) * JOKER_THRESHOLD_INCREMENTS[selectedMode];
+}
+export function createInitialState(mode = DEFAULT_MODE) { const selectedMode = GAME_MODES[mode] ? mode : DEFAULT_MODE; const jokerRefillCount = 0; const jokerThreshold = getNextJokerThreshold(selectedMode, jokerRefillCount); return { mode: selectedMode, jokerThreshold, jokerRefillCount, board: createEmptyBoard(), trayDice: [], previousBatchDice: [], jokerStock: 0, jokerCountdown: jokerThreshold, score: 0, highScore: 0, rankings: [], gameOver: false, message: '補充で4つのサイコロをストックしてください。' }; }
 
 export function getGroups() {
   const groups = [];
@@ -88,5 +100,19 @@ export function placeDie(board, row, col, die) {
 }
 export function lockUnlockedDice(board) { const next = cloneBoard(board); const locked = []; for (let r=0;r<BOARD_SIZE;r++) for (let c=0;c<BOARD_SIZE;c++) if (next[r][c] && !next[r][c].locked) { delete next[r][c].underlyingDie; next[r][c].locked = true; locked.push(next[r][c]); } return { board: next, locked }; }
 export function hasEmptyCell(board) { return board.some(row => row.some(cell => cell === null)); }
-export function awardJokers(state, points) { let countdown = state.jokerCountdown; let stock = state.jokerStock; if (stock >= MAX_JOKERS) return { jokerStock: MAX_JOKERS, jokerCountdown: 0 }; countdown -= points; while (countdown <= 0 && stock < MAX_JOKERS) { stock++; countdown += (state.jokerThreshold || JOKER_THRESHOLD); } if (stock >= MAX_JOKERS) countdown = 0; return { jokerStock: stock, jokerCountdown: countdown }; }
+export function awardJokers(state, points) {
+  let countdown = state.jokerCountdown ?? getNextJokerThreshold(state.mode, state.jokerRefillCount);
+  let stock = state.jokerStock;
+  let refillCount = state.jokerRefillCount || 0;
+  if (stock >= MAX_JOKERS) return { jokerStock: MAX_JOKERS, jokerCountdown: 0, jokerRefillCount: refillCount, jokerThreshold: getNextJokerThreshold(state.mode, refillCount) };
+  countdown -= points;
+  while (countdown <= 0 && stock < MAX_JOKERS) {
+    stock++;
+    refillCount++;
+    countdown += getNextJokerThreshold(state.mode, refillCount);
+  }
+  const nextThreshold = getNextJokerThreshold(state.mode, refillCount);
+  if (stock >= MAX_JOKERS) countdown = 0;
+  return { jokerStock: stock, jokerCountdown: countdown, jokerRefillCount: refillCount, jokerThreshold: nextThreshold };
+}
 export function saveRanking(rankings, name, score) { return [...rankings, { name: (name || 'NO NAME').slice(0, 12), score, date: new Date().toISOString() }].sort((a,b)=>b.score-a.score).slice(0,15); }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { awardJokers, createDie, createEmptyBoard, createInitialState, evaluateBoard, evaluateDice, getGroups, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, moveDie, placeDie, rollBalancedDice, rollDice, saveRanking, hasScoringCandidate } from '../src/game.js';
+import { awardJokers, createDie, createEmptyBoard, createInitialState, evaluateBoard, evaluateDice, getGroups, getNextJokerThreshold, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, moveDie, placeDie, rollBalancedDice, rollDice, saveRanking, hasScoringCandidate } from '../src/game.js';
 
 test('board groups are 20: rows, columns, diagonals, blocks, corners', () => {
   const groups = getGroups();
@@ -45,16 +45,22 @@ test('unlocked dice can move but locked dice cannot move', () => {
   assert.equal(moved.board[1][1].id, die.id);
 });
 
-test('normal joker is awarded every 400 points and capped at two', () => {
+test('normal joker thresholds increase and stock is capped at two', () => {
   let state = createInitialState('normal');
-  state = awardJokers(state, 399);
+  assert.equal(getNextJokerThreshold('normal', 0), 120);
+  assert.equal(getNextJokerThreshold('normal', 1), 200);
+  assert.equal(getNextJokerThreshold('normal', 2), 300);
+  state = { ...state, ...awardJokers(state, 119) };
   assert.equal(state.jokerStock, 0);
   assert.equal(state.jokerCountdown, 1);
-  state = awardJokers(state, 1);
+  state = { ...state, ...awardJokers(state, 1) };
   assert.equal(state.jokerStock, 1);
-  assert.equal(state.jokerCountdown, 400);
-  state = awardJokers(state, 2000);
+  assert.equal(state.jokerRefillCount, 1);
+  assert.equal(state.jokerThreshold, 200);
+  assert.equal(state.jokerCountdown, 200);
+  state = { ...state, ...awardJokers(state, 2000) };
   assert.equal(state.jokerStock, MAX_JOKERS);
+  assert.equal(state.jokerRefillCount, 2);
   assert.equal(state.jokerCountdown, 0);
 });
 
@@ -140,12 +146,24 @@ test('balanced ROLL ensures recent two batches contain a scoring candidate', () 
   assert.equal(hasScoringCandidate([...previous, ...batch]), true);
 });
 
-test('easy mode uses a 280 point joker threshold', () => {
+test('easy mode uses increasing joker thresholds', () => {
   let state = createInitialState('easy');
   assert.equal(state.mode, 'easy');
-  assert.equal(state.jokerThreshold, 280);
-  assert.equal(state.jokerCountdown, 280);
-  state = awardJokers(state, 280);
+  assert.equal(getNextJokerThreshold('easy', 0), 80);
+  assert.equal(getNextJokerThreshold('easy', 1), 130);
+  assert.equal(getNextJokerThreshold('easy', 2), 190);
+  assert.equal(state.jokerThreshold, 80);
+  assert.equal(state.jokerCountdown, 80);
+  state = { ...state, ...awardJokers(state, 80) };
   assert.equal(state.jokerStock, 1);
-  assert.equal(state.jokerCountdown, 280);
+  assert.equal(state.jokerRefillCount, 1);
+  assert.equal(state.jokerThreshold, 130);
+  assert.equal(state.jokerCountdown, 130);
+});
+
+test('full joker stock does not increase refill count', () => {
+  const state = { ...createInitialState('easy'), jokerStock: MAX_JOKERS, jokerRefillCount: 1, jokerCountdown: 0 };
+  const awarded = awardJokers(state, 999);
+  assert.equal(awarded.jokerStock, MAX_JOKERS);
+  assert.equal(awarded.jokerRefillCount, 1);
 });

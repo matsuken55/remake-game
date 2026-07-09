@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { awardJokers, createDie, createEmptyBoard, createInitialState, evaluateBoard, evaluateDice, getGroups, getNextJokerThreshold, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, moveDie, placeDie, rollBalancedDice, rollDice, saveRanking, hasScoringCandidate } from '../src/game.js';
+import { awardJokers, createDie, createEmptyBoard, createInitialState, createJoker, evaluateBoard, evaluateDice, getGroups, getNextJokerThreshold, hasEmptyCell, lockUnlockedDice, MAX_JOKERS, moveDie, placeDie, rollBalancedDice, rollDice, saveRanking, hasScoringCandidate } from '../src/game.js';
 
 test('board groups are 20: rows, columns, diagonals, blocks, corners', () => {
   const groups = getGroups();
@@ -52,16 +52,50 @@ test('normal joker thresholds increase and stock is capped at two', () => {
   assert.equal(getNextJokerThreshold('normal', 2), 300);
   state = { ...state, ...awardJokers(state, 119) };
   assert.equal(state.jokerStock, 0);
-  assert.equal(state.jokerCountdown, 1);
+  assert.equal(state.jokerChargePoints, 119);
+  assert.equal(state.jokerCountdown, 119);
   state = { ...state, ...awardJokers(state, 1) };
   assert.equal(state.jokerStock, 1);
   assert.equal(state.jokerRefillCount, 1);
   assert.equal(state.jokerThreshold, 200);
-  assert.equal(state.jokerCountdown, 200);
+  assert.equal(state.jokerChargePoints, 0);
+  assert.equal(state.jokerCountdown, 0);
   state = { ...state, ...awardJokers(state, 2000) };
   assert.equal(state.jokerStock, MAX_JOKERS);
   assert.equal(state.jokerRefillCount, 2);
   assert.equal(state.jokerCountdown, 0);
+});
+
+
+test('joker charge resets without carrying surplus and preserves refill stage when stock is full', () => {
+  let state = createInitialState('normal');
+  state = { ...state, ...awardJokers(state, 150) };
+  assert.equal(state.jokerStock, 1);
+  assert.equal(state.jokerChargePoints, 0);
+  assert.equal(state.jokerRefillCount, 1);
+  assert.equal(state.jokerThreshold, 200);
+  state = { ...state, jokerStock: MAX_JOKERS, ...awardJokers({ ...state, jokerStock: MAX_JOKERS }, 999) };
+  assert.equal(state.jokerStock, MAX_JOKERS);
+  assert.equal(state.jokerRefillCount, 1);
+  assert.equal(state.jokerThreshold, 200);
+});
+
+test('multiple jokers can be evaluated independently on the board', () => {
+  let board = createEmptyBoard();
+  board = placeDie(board, 0, 0, createJoker());
+  board = placeDie(board, 0, 1, createJoker());
+  board = placeDie(board, 0, 2, createDie('red', 3));
+  board = placeDie(board, 0, 3, createDie('red', 4));
+  const locked = lockUnlockedDice(board);
+  const matches = evaluateBoard(locked.board, locked.locked.map(d => d.id));
+  assert.ok(matches.some(match => match.type === 'row' && match.cells.every(([r]) => r === 0)));
+});
+
+test('joker cannot be placed on top of another joker', () => {
+  let board = createEmptyBoard();
+  board = placeDie(board, 0, 0, createJoker());
+  assert.throws(() => placeDie(board, 0, 0, createJoker()), /occupied/);
+  assert.equal(board[0][0].joker, true);
 });
 
 test('joker works as a wildcard', () => {
@@ -153,12 +187,14 @@ test('easy mode uses increasing joker thresholds', () => {
   assert.equal(getNextJokerThreshold('easy', 1), 130);
   assert.equal(getNextJokerThreshold('easy', 2), 190);
   assert.equal(state.jokerThreshold, 80);
-  assert.equal(state.jokerCountdown, 80);
+  assert.equal(state.jokerChargePoints, 0);
+  assert.equal(state.jokerCountdown, 0);
   state = { ...state, ...awardJokers(state, 80) };
   assert.equal(state.jokerStock, 1);
   assert.equal(state.jokerRefillCount, 1);
   assert.equal(state.jokerThreshold, 130);
-  assert.equal(state.jokerCountdown, 130);
+  assert.equal(state.jokerChargePoints, 0);
+  assert.equal(state.jokerCountdown, 0);
 });
 
 test('full joker stock does not increase refill count', () => {

@@ -79,7 +79,7 @@ async function build() {
   try { responsiveCss = await read('src/responsive-playables.css'); } catch { /* PR #22 not yet merged */ }
   const offlinePrelude = [
     'const OFFLINE_ASSETS = ' + JSON.stringify(assets) + ';',
-    'function offlineAsset(path) { return OFFLINE_ASSETS[path] || path; }',
+    'function offlineAsset(path) { return OFFLINE_ASSETS[path] || (path.startsWith("assets/audio/") ? "data:audio/mpeg;base64," : path); }',
     'globalThis.__NARABETEPON_OFFLINE__ = true;',
   ].join('\n');
   const rankOffline = rankings

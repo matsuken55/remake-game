@@ -1,0 +1,48 @@
+name: Build standalone offline HTML
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'src/**'
+      - 'assets/**'
+      - 'scripts/build-offline.mjs'
+      - 'package.json'
+      - '.github/workflows/offline-html.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-html:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check game tests
+        run: npm test
+      - name: Build offline standalone HTML
+        run: npm run build:offline
+      - name: Confirm bundled sources
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const html = readFileSync('dist/ならべてポン-offline.html','utf8');
+            for (const forbidden of ['type=\"module\"','./src/main.js','./src/styles.css','https://script.google.com/macros/']) {
+              if (html.includes(forbidden)) throw Error('Offline bundle contains forbidden external reference: '+forbidden);
+            }
+            if (!html.includes('data:image/png;base64,')) throw Error('Dice images not embedded');
+            console.log('Standalone HTML structural checks passed');
+          "
+      - name: Upload downloadable offline HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: narabetepon-offline-html
+          path: dist/ならべてポン-offline.html
+          if-no-files-found: error

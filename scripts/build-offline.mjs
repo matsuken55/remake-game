@@ -83,6 +83,7 @@ async function build() {
     'globalThis.__NARABETEPON_OFFLINE__ = true;',
   ].join('\n');
   const rankOffline = rankings
+    .replace(/export const RANKING_API_URL = [^;]+;/, "export const RANKING_API_URL = '';" )
     .replace('function jsonp(params, timeoutMs = 8000) {', 'function jsonp(params, timeoutMs = 8000) {\n  return Promise.reject(new Error("Offline: no external ranking service"));')
     .replace(/export async function submitRemoteRanking\([\s\S]*?\n\}/, 'export async function submitRemoteRanking(mode, name, score) {\n  return { ok: true, offline: true };\n}');
   if (rankOffline === rankings || !rankOffline.includes('offline: true')) {
@@ -98,7 +99,10 @@ async function build() {
     '})();',
   ].join('\n');
   const escapeScriptClose = s => s.replace(/<\/script/gi, '<\\/script');
-  const output = html
+  const offlineHtml = html
+    .replace('オンラインランキングを取得して表示します。取得できない場合は端末内ランキングを表示します。', 'ローカル版ではこの端末に保存されたランキングを表示します。')
+    .replace('名前を登録して端末内ランキングとオンラインランキングに保存します。', '名前を登録して、この端末内のランキングに保存します。');
+  const output = offlineHtml
     .replace(/<link\s+rel="stylesheet"\s+href="\.\/src\/styles\.css"\s*\/>/, '<style>\n' + css + '\n' + responsiveCss + '\n</style>')
     .replace(/\s*<link\s+rel="stylesheet"\s+href="\.\/src\/responsive-playables\.css"\s*\/>/, '')
     .replace(/<script\s+type="module"\s+src="\.\/src\/main\.js"\s*><\/script>/, '<script>\n' + escapeScriptClose(combinedJs) + '\n</script>');

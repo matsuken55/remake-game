@@ -1,0 +1,145 @@
+/*
+ * Playables-ready responsive layout layer.
+ * UI-only: game logic, drag state, scores and audio are unchanged.
+ * Layout is CSS-driven so rotating/resizing never restarts the game.
+ */
+:root { --play-gap: clamp(6px, 1vmin, 12px); }
+html { min-width: 0; }
+body { min-width: 0; overflow-x: clip; }
+.app { box-sizing: border-box; min-width: 0; }
+.app > * { min-width: 0; }
+.board-wrap { min-width: 0; display: flex; justify-content: center; }
+.board {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+.cell { box-sizing: border-box; min-width: 0; min-height: 0; }
+.die { box-sizing: border-box; width: 88%; min-width: 0; border-radius: clamp(5px, 1.8vmin, 18px); }
+.play-area { min-width: 0; }
+.tray-panel, .joker-panel, .main-action { min-width: 0; }
+.tray-slot, .joker-slot { box-sizing: border-box; max-width: 100%; }
+.actions { min-width: 0; }
+.game-over, dialog { box-sizing: border-box; max-height: min(90dvh, 780px); overflow-y: auto; overscroll-behavior: contain; }
+.start-overlay, .overlay { box-sizing: border-box; padding: 8px; }
+button:focus-visible { outline: 3px solid #fef08a; outline-offset: 2px; }
+
+/* Portrait: compact stock beside a centered, square 4×4 board. */
+@media (orientation: portrait) {
+  .app {
+    width: min(100% - 12px, 620px);
+    margin-inline: auto;
+    gap: var(--play-gap);
+    padding-block: 6px max(8px, env(safe-area-inset-bottom));
+  }
+  .play-area {
+    grid-template-columns: clamp(56px, 18vw, 92px) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--play-gap);
+  }
+  .board-wrap { align-self: start; }
+  .board { max-width: min(100%, 520px); gap: clamp(3px, 1vw, 8px); }
+  .tray { grid-template-columns: 1fr; gap: 6px; justify-items: center; }
+  .tray-slot { width: min(100%, 64px); height: auto; aspect-ratio: 1; }
+  .joker-slot { width: clamp(44px, 11vw, 64px); height: auto; aspect-ratio: 1; }
+  .status { padding: .55rem; }
+  .control-row { justify-content: center; }
+  .primary-action { min-height: 52px; }
+  .action-hint { font-size: .75rem; }
+  .actions { gap: 4px; }
+}
+@media (orientation: portrait) and (max-width: 390px) {
+  .app { width: calc(100% - 8px); }
+  .top-status { font-size: .82rem; }
+  .status, .control-row, .tray-panel, .joker-panel { padding: .42rem; }
+  .play-area { grid-template-columns: 54px minmax(0, 1fr); gap: 5px; }
+  .tray-slot { width: 46px; }
+  .board { gap: 3px; }
+  .cell { border-width: 1px; border-radius: 10px; }
+  .primary-action { min-height: 48px; }
+  .actions button { font-size: .72rem; padding: .35rem .45rem; }
+}
+
+/* Landscape: information and actions on left, dice stock and square board on right.
+   Available viewport HEIGHT caps board size, not viewport width. */
+@media (orientation: landscape) {
+  body { display: block; }
+  .app {
+    width: calc(100% - 16px);
+    max-width: 1440px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    padding: 5px 0 max(6px, env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: minmax(170px, 0.6fr) minmax(0, 1.6fr);
+    grid-template-areas:
+      "status status"
+      "control play"
+      "actions actions";
+    align-content: start;
+    align-items: start;
+    gap: var(--play-gap);
+  }
+  .hero { display: none; }
+  .top-status { grid-area: status; padding: .4rem .65rem; gap: .7rem; }
+  .top-status #message { flex-basis: auto; }
+  .control-row {
+    grid-area: control;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: .4rem;
+    gap: .45rem;
+  }
+  .main-action { width: 100%; }
+  .primary-action { min-width: 0; width: 100%; min-height: 52px; }
+  .action-hint { max-width: none; font-size: .73rem; }
+  .joker-panel { width: 100%; box-sizing: border-box; flex-wrap: wrap; justify-content: center; padding: .4rem; }
+  .joker-panel h2 { flex-basis: 100%; text-align: center; }
+  .joker-countdown { font-size: .75rem; text-align: center; }
+  .joker-slot { width: clamp(38px, 6dvh, 60px); height: auto; aspect-ratio: 1; }
+  .play-area {
+    grid-area: play;
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: clamp(46px, 9dvh, 86px) minmax(0, 1fr);
+    justify-content: center;
+    gap: var(--play-gap);
+  }
+  .tray-panel { padding: .4rem; }
+  .tray { grid-template-columns: 1fr; gap: 4px; justify-items: center; }
+  .tray-slot { width: 100%; height: auto; aspect-ratio: 1; }
+  .board-wrap { justify-content: flex-start; }
+  .board {
+    width: min(100%, max(148px, calc(100dvh - 132px)), 680px);
+    height: auto;
+    gap: clamp(2px, .8dvh, 9px);
+  }
+  .cell { border-radius: clamp(5px, 2dvh, 18px); border-width: clamp(1px, .3dvh, 2px); }
+  .actions { grid-area: actions; padding: .3rem; justify-content: center; }
+  .actions button { min-height: 40px; padding: .34rem .6rem; font-size: .75rem; }
+}
+@media (orientation: landscape) and (max-height: 440px) {
+  .app { gap: 4px; }
+  .top-status { font-size: .78rem; padding: .2rem .45rem; }
+  .top-status #message { display: none; }
+  .control-row, .tray-panel, .joker-panel { padding: .25rem; border-radius: 10px; }
+  .primary-action { min-height: 44px; padding: .35rem; font-size: 1.1rem; }
+  .action-hint { font-size: .67rem; }
+  .board { width: min(100%, max(136px, calc(100dvh - 95px))); }
+  .tray-panel h2 { font-size: .75rem; }
+  .tray-slot { max-height: 15dvh; }
+  .actions { padding: 2px; }
+  .actions button { min-height: 34px; padding: .2rem .45rem; font-size: .68rem; }
+}
+@media (orientation: landscape) and (max-width: 640px) {
+  .app { grid-template-columns: minmax(132px, .6fr) minmax(0, 1.5fr); }
+  .play-area { grid-template-columns: 42px minmax(0,1fr); gap: 4px; }
+}
+/* The OS-level browser navigation gestures cannot be disabled by a webpage;
+   keep touch manipulation disabled only on the play surface. */
+.play-area, .play-area .die, .board, .cell, .joker-slot, .tray-slot { touch-action: none; }

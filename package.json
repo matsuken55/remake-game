@@ -1,1 +1,9 @@
-{"scripts":{"test":"node --test","start":"node server.js"},"type":"module","devDependencies":{}}
+{
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.js",
+    "build:offline": "node scripts/build-offline.mjs"
+  },
+  "type": "module",
+  "devDependencies": {}
+}
